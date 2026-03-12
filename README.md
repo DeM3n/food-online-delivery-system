@@ -61,7 +61,7 @@ DB_NAME=ofds_db
 DB_USER=sa
 DB_PASS=YOUR_ACTUAL_DB_PASSWORD
 
-JWT_SECRET=supersecret_jwt_key_ofds_2026
+JWT_SECRET=CHANGE_THIS_TO_A_LONG_RANDOM_SECRET_STRING
 ```
 
 > ⚠️ Make sure your database server (MySQL/MSSQL) is running and the database `ofds_db` has been created.
