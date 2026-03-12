@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-textMain font-sans;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  /* Food Delivery Soft Rounded Cards */
+  .card {
+    @apply bg-white rounded-2xl shadow-soft transition-transform duration-300 hover:-translate-y-1;
+  }
+  
+  /* Primary Action Button */
+  .btn-primary {
+    @apply bg-primary text-white font-semibold py-2 px-6 rounded-full shadow-md hover:bg-orange-600 transition-colors duration-200 active:scale-95;
+  }
+
+  /* Secondary Action Button */
+  .btn-secondary {
+    @apply bg-secondary text-white font-semibold py-2 px-6 rounded-full shadow-md hover:bg-teal-600 transition-colors duration-200 active:scale-95;
+  }
+
+  /* Badge Outlines */
+  .badge {
+    @apply px-3 py-1 rounded-full text-sm font-semibold;
+  }
+  .badge-pending { @apply bg-yellow-100 text-yellow-700; }
+  .badge-preparing { @apply bg-blue-100 text-blue-700; }
+  .badge-delivering { @apply bg-teal-100 text-teal-700; }
+  .badge-completed { @apply bg-green-100 text-green-700; }
+
+  /* Premium Inputs */
+  .input-field {
+    @apply w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-gray-700 focus:bg-white focus:border-primary focus:ring-2 focus:ring-orange-100 outline-none transition-all duration-200;
+  }
+
+  .shadow-soft {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+  }
+}
+
+/* Custom scrollbar to look sleek */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1; 
+}
+::-webkit-scrollbar-thumb {
+  background: #ccc; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #FF6B35; 
+}

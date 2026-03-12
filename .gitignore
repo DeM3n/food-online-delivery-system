@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / Editor Files
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build outputs (if any)
+dist/
+dist-ssr/
+build/
+
+# Temporary / Debugging Files (specific to this scratch project)
+*.txt
+*.sql
+backend/fix_*.js
+backend/check_*.js
+backend/test_*.js
+backend/reset_*.js
+backend/sync_*.js
+check_models.js
+model_audit.json
