@@ -1,39 +1,55 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
+const { authError } = require('../utils/authErrorUtils');
 
 // Protect route middleware
 exports.protect = async (req, res, next) => {
   let token;
 
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
     try {
       token = req.headers.authorization.split(' ')[1];
 
-      // Decode token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
 
-      // Add user to request
-      req.user = await User.findByPk(decoded.id, { attributes: { exclude: ['password'] } });
-
-      if (!req.user) {
-        return res.status(401).json({ success: false, message: 'Not authorized, user not found' });
+      if (decoded.type && decoded.type !== 'access') {
+        return authError(res, 401, 'Invalid token type', 'AUTH_INVALID_TOKEN_TYPE');
       }
 
+      const userId = decoded.sub || decoded.id;
+
+      req.user = await User.findByPk(userId, {
+        attributes: { exclude: ['password_hash'] }
+      });
+
+      if (!req.user) {
+        return authError(res, 401, 'Not authorized, user not found', 'AUTH_USER_NOT_FOUND');
+      }
+
+      if (!req.user.is_active) {
+        return authError(res, 403, 'Account is inactive', 'AUTH_ACCOUNT_INACTIVE');
+      }
+
+      req.auth = decoded;
       next();
     } catch (error) {
-      console.error(error);
-      return res.status(401).json({ success: false, message: 'Not authorized, token failed' });
+      console.error('Protect middleware error:', error);
+      return authError(res, 401, 'Not authorized, token failed', 'AUTH_TOKEN_FAILED');
     }
   } else {
-    return res.status(401).json({ success: false, message: 'Not authorized, no token' });
+    return authError(res, 401, 'Not authorized, no token', 'AUTH_NO_TOKEN');
   }
 };
 
-// Role-based authorization middleware
 exports.authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: `User role ${req.user.role} is not authorized to access this route` });
+      return authError(
+        res,
+        403,
+        `User role ${req.user.role} is not authorized to access this route`,
+        'AUTH_ROLE_FORBIDDEN'
+      );
     }
     next();
   };
