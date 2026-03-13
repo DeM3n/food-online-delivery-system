@@ -7,6 +7,7 @@ const Customer = require('./Customer');
 const DeliveryPartner = require('./DeliveryPartner');
 const Admin = require('./Admin');
 const CustomerSupport = require('./CustomerSupport');
+const AuthOtp = require('./AuthOtp');
 
 const Address = require('./Address');
 const MenuCategory = require('./MenuCategory');
@@ -20,6 +21,7 @@ const Delivery = require('./Delivery');
 const Dispute = require('./Dispute');
 const Review = require('./Review');
 const Notification = require('./Notification');
+const AuthSession = require('./AuthSession');
 
 // ==========================================
 // Define Relationships Based on UML Diagram
@@ -113,6 +115,12 @@ Dispute.belongsTo(CustomerSupport, { foreignKey: 'handled_by' });
 User.hasMany(Notification, { foreignKey: 'user_id' });
 Notification.belongsTo(User, { foreignKey: 'user_id' });
 
+User.hasMany(AuthSession, { foreignKey: 'user_id' });
+AuthSession.belongsTo(User, { foreignKey: 'user_id' });
+
+User.hasMany(AuthOtp, { foreignKey: 'user_id' });
+AuthOtp.belongsTo(User, { foreignKey: 'user_id' });
+
 module.exports = {
   sequelize,
   User,
@@ -132,5 +140,7 @@ module.exports = {
   Delivery,
   Dispute,
   Review,
-  Notification
+  Notification,
+  AuthSession,
+  AuthOtp,
 };
