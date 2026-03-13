@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { updateQuantity, removeFromCart } from '../../redux/slices/cartSlice';
+import { updateQuantityAsync, removeItemAsync } from '../../redux/slices/cartSlice';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function CartPage() {
@@ -33,7 +33,7 @@ export default function CartPage() {
             <div key={item.id} className="flex justify-between items-center p-4 border border-gray-100 rounded-xl">
               <div className="flex items-center gap-4">
                 <img
-                  src={item.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
+                  src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&h=100&fit=crop'}
                   className="w-16 h-16 rounded-lg object-cover"
                   alt={item.name}
                 />
@@ -45,17 +45,17 @@ export default function CartPage() {
               <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => dispatch(updateQuantity({ id: item.id, quantity: item.quantity - 1 }))}
+                    onClick={() => dispatch(updateQuantityAsync({ itemId: item.cartItemId, quantity: item.quantity - 1 }))}
                     className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
                   >-</button>
                   <span className="font-semibold w-4 text-center">{item.quantity}</span>
                   <button
-                    onClick={() => dispatch(updateQuantity({ id: item.id, quantity: item.quantity + 1 }))}
+                    onClick={() => dispatch(updateQuantityAsync({ itemId: item.cartItemId, quantity: item.quantity + 1 }))}
                     className="w-8 h-8 rounded-full bg-primary text-white hover:bg-orange-600"
                   >+</button>
                 </div>
                 <button
-                  onClick={() => dispatch(removeFromCart(item.id))}
+                  onClick={() => dispatch(removeItemAsync(item.cartItemId))}
                   className="text-xs text-red-400 hover:text-red-600 font-medium"
                 >Remove</button>
               </div>

@@ -85,30 +85,41 @@ exports.getMonthlyFavorite = async (req, res) => {
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
 
-        const favoriteFood = await OrderItem.findAll({
+        // 1. Tìm ID món ăn xuất hiện nhiều nhất trong tháng
+        const favoriteData = await OrderItem.findOne({
             attributes: [
                 'menu_item_id',
                 [sequelize.fn('COUNT', sequelize.col('menu_item_id')), 'count']
             ],
-            include: [
-                {
-                    model: Order,
-                    where: {
-                        customer_id: customer.id,
-                        created_at: { [Op.gte]: startOfMonth }
-                    },
-                    attributes: []
+            include: [{
+                model: Order,
+                where: {
+                    customer_id: customer.id,
+                    created_at: { [Op.gte]: startOfMonth }
                 },
-                { model: MenuItem }
-            ],
-            group: ['menu_item_id', 'MenuItem.id'],
+                attributes: []
+            }],
+            group: ['menu_item_id'],
             order: [[sequelize.literal('count'), 'DESC']],
-            limit: 1
+            limit: 1,
+            raw: true
         });
 
-        res.json({ success: true, data: favoriteFood[0] || null });
+        let result = null;
+        if (favoriteData && favoriteData.menu_item_id) {
+            // 2. Lấy thông tin chi tiết của món đó
+            const menuItem = await MenuItem.findByPk(favoriteData.menu_item_id);
+            if (menuItem) {
+                result = {
+                    ...menuItem.toJSON(),
+                    count: favoriteData.count
+                };
+            }
+        }
+
+        res.json({ success: true, data: result });
     } catch (error) {
-        console.error(error);
+        console.error('Error in getMonthlyFavorite:', error);
         res.status(500).json({ success: false, message: 'Server Error' });
     }
 };

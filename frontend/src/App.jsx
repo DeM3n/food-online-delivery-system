@@ -3,7 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { io } from 'socket.io-client';
 import axios from 'axios';
-import { loginSuccess } from './redux/slices/authSlice';
+import { loginSuccess, logout as logoutAction } from './redux/slices/authSlice';
+import { fetchCart, resetCartState } from './redux/slices/cartSlice';
 
 // Layouts
 import CustomerLayout from './components/layouts/CustomerLayout';
@@ -65,18 +66,32 @@ function App() {
               profile: profile,
               token: token
             }));
+            
+            // Fetch cart from database once logged in
+            if (data.role === 'customer') {
+              dispatch(fetchCart());
+            }
           }
         } catch (error) {
           console.error('Auto-login failed:', error);
           // If token is invalid, clear it
           if (error.response?.status === 401) {
-            localStorage.removeItem('token');
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('user');
+            sessionStorage.removeItem('profile');
+            dispatch(logoutAction());
+            dispatch(resetCartState());
           }
         }
       }
     };
 
     fetchUser();
+
+    // If user is already in session (from sessionStorage), fetch their cart on refresh
+    if (token && user && user.role === 'customer') {
+      dispatch(fetchCart());
+    }
     
     socket.on('connect', () => {
       console.log('Connected to real-time server');

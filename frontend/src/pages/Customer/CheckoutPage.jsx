@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { clearCart } from '../../redux/slices/cartSlice';
+import { clearCartAsync } from '../../redux/slices/cartSlice';
 import { notification } from 'antd';
 import { CreditCardOutlined, MoneyCollectOutlined, HomeOutlined, PhoneOutlined, MessageOutlined } from '@ant-design/icons';
 
@@ -56,7 +56,7 @@ export default function CheckoutPage() {
                     description: 'Your order has been received!',
                     placement: 'topRight'
                 });
-                dispatch(clearCart());
+                dispatch(clearCartAsync());
                 navigate('/customer'); // Redirect to Home after successful order
             }
         } catch (error) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { addToCart } from '../../redux/slices/cartSlice';
+import { addToCartAsync } from '../../redux/slices/cartSlice';
 import axios from 'axios';
 import { notification } from 'antd';
 
@@ -37,18 +37,34 @@ export default function RestaurantMenu() {
         fetchMenuData();
     }, [restaurantId]);
 
-    const handleAdd = (item) => {
-        dispatch(addToCart({
-            ...item,
-            restaurantId: restaurant.id
-        }));
-
-        notification.success({
-            message: 'Đã thêm vào giỏ hàng',
-            description: `${item.name} đã được thêm vào giỏ hàng của bạn!`,
-            placement: 'bottomRight',
-            duration: 2,
+    const handleAdd = async (item) => {
+        const loadingNotify = notification.info({
+            message: 'Đang thêm...',
+            description: 'Vui lòng đợi trong giây lát',
+            duration: 0,
         });
+
+        try {
+            await dispatch(addToCartAsync({
+                menu_item_id: item.id,
+                quantity: 1,
+                restaurant_id: restaurant.id
+            })).unwrap();
+
+            notification.destroy();
+            notification.success({
+                message: 'Đã thêm vào giỏ hàng',
+                description: `${item.name} đã được thêm vào giỏ hàng của bạn!`,
+                placement: 'bottomRight',
+                duration: 2,
+            });
+        } catch (error) {
+            notification.destroy();
+            notification.error({
+                message: 'Lỗi',
+                description: 'Không thể thêm món vào giỏ hàng. Vui lòng thử lại!',
+            });
+        }
     };
 
     if (loading) return (

@@ -3,6 +3,7 @@ import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../../redux/slices/authSlice';
+import { fetchCart } from '../../redux/slices/cartSlice';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
@@ -58,6 +59,11 @@ export default function Login() {
                 profile: data.profile,
                 token: data.token
               }));
+
+              // Fetch cart right after login if customer
+              if (data.role.toLowerCase() === 'customer') {
+                dispatch(fetchCart());
+              }
 
               handleRedirect(data.role);
             } catch (err) {

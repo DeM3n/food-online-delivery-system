@@ -3,14 +3,16 @@ import React from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../redux/slices/authSlice';
+import { resetCartState } from '../../redux/slices/cartSlice';
 
 export default function GenericLayout({ roleTitle, rolePath }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user } = useSelector(state => state.auth);
+  const { user, profile } = useSelector(state => state.auth);
 
   const handleLogout = () => {
     dispatch(logout());
+    dispatch(resetCartState());
     navigate('/login');
   };
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../redux/slices/authSlice';
+import { resetCartState } from '../../redux/slices/cartSlice';
 import { Badge } from 'antd';
 import { UserOutlined, ShoppingCartOutlined, HomeOutlined, ShopOutlined } from '@ant-design/icons';
 
@@ -15,6 +16,7 @@ export default function CustomerLayout() {
 
   const handleLogout = () => {
     dispatch(logout());
+    dispatch(resetCartState());
     navigate('/login');
   };
 
