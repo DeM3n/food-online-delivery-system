@@ -41,8 +41,9 @@ exports.addItemToCart = async (req, res) => {
         let cart = await Cart.findOne({ where: { customer_id: customer.id } });
 
         // If no cart or changing restaurant, reset cart
-        if (!cart || (cart.restaurant_id && cart.restaurant_id !== restaurant_id)) {
+        if (!cart || cart.restaurant_id !== restaurant_id) {
             if (cart) {
+                // Clear items from previous restaurant
                 await CartItem.destroy({ where: { cart_id: cart.id } });
                 cart.restaurant_id = restaurant_id;
                 await cart.save();

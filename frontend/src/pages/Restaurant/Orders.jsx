@@ -3,9 +3,10 @@ import { useSelector } from 'react-redux';
 import axios from 'axios';
 import { notification } from 'antd';
 import { CheckCircleOutlined, SyncOutlined, ClockCircleOutlined, CarOutlined } from '@ant-design/icons';
+import socket from '../../socket';
 
 export default function RestaurantOrders() {
-  const { profile, token } = useSelector(state => state.auth);
+  const { profile, token, user } = useSelector(state => state.auth);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,8 +26,30 @@ export default function RestaurantOrders() {
   useEffect(() => {
     if (profile?.id) {
       fetchOrders();
+
+      // Real-time notifications
+      socket.connect();
+      socket.emit('join', user.id);
+
+      socket.on('NEW_ORDER', (data) => {
+        notification.success({
+          message: 'New Order Received!',
+          description: `Order #${data.orderId.slice(0, 8)} has been placed.`,
+        });
+        fetchOrders(); // Auto refresh
+      });
+
+      socket.on('ORDER_STATUS_UPDATED', (data) => {
+        fetchOrders(); // Auto refresh when driver picks up or delivers
+      });
+
+      return () => {
+        socket.off('NEW_ORDER');
+        socket.off('ORDER_STATUS_UPDATED');
+        socket.disconnect();
+      };
     }
-  }, [profile]);
+  }, [profile, user]);
 
   const updateStatus = async (orderId, newStatus) => {
     try {

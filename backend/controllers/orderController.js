@@ -33,12 +33,39 @@ exports.getRestaurantOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { status } = req.body;
-        const order = await Order.findByPk(req.params.id);
+        const order = await Order.findByPk(req.params.id, {
+            include: [{ model: Customer }, { model: Restaurant }]
+        });
         if (!order) {
             return res.status(404).json({ success: false, message: 'Order not found' });
         }
         order.status = status;
         await order.save();
+
+        // Socket notification for customer
+        if (order.Customer) {
+            req.io.to(order.Customer.user_id).emit('ORDER_STATUS_UPDATED', {
+                orderId: order.id,
+                status: order.status
+            });
+        }
+
+        // Socket notification for restaurant
+        if (order.Restaurant) {
+            req.io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', {
+                orderId: order.id,
+                status: order.status
+            });
+        }
+
+        // Socket notification for drivers if order is ready for pickup
+        if (status === 'ready_for_pickup') {
+            req.io.to('available_deliveries').emit('AVAILABLE_DELIVERY', {
+                orderId: order.id,
+                restaurantName: order.Restaurant?.name || 'Restaurant'
+            });
+        }
+
         res.json({ success: true, data: order });
     } catch (error) {
         console.error(error);
@@ -130,6 +157,8 @@ exports.getMonthlyFavorite = async (req, res) => {
 exports.createOrder = async (req, res) => {
     const t = await sequelize.transaction();
     try {
+        console.log('Order received:', req.body);
+        console.log('From user:', req.user);
         const { 
             restaurant_id, 
             items, 
@@ -200,6 +229,15 @@ exports.createOrder = async (req, res) => {
         }
 
         await t.commit();
+
+        // Socket notification for restaurant - using io instance from req
+        if (restaurant) {
+            req.io.to(restaurant.user_id).emit('NEW_ORDER', {
+                orderId: order.id,
+                totalAmount: total_amount
+            });
+        }
+
         res.status(201).json({ success: true, data: order });
     } catch (error) {
         await t.rollback();
@@ -232,13 +270,12 @@ exports.getAvailableDeliveries = async (req, res) => {
     }
 };
 
-// @desc    Driver accepts a delivery
-// @route   PUT /api/orders/:id/accept-delivery
-// @access  Private
 exports.acceptDelivery = async (req, res) => {
     try {
         const { driver_id } = req.body;
-        const order = await Order.findByPk(req.params.id);
+        const order = await Order.findByPk(req.params.id, {
+            include: [{ model: Customer }, { model: Restaurant }]
+        });
         
         if (!order) {
             return res.status(404).json({ success: false, message: 'Order not found' });
@@ -250,6 +287,16 @@ exports.acceptDelivery = async (req, res) => {
         order.delivery_partner_id = driver_id;
         order.status = 'out_for_delivery';
         await order.save();
+
+        // Notify other drivers to remove this from their available list
+        req.io.to('available_deliveries').emit('ORDER_ACCEPTED', {
+            orderId: order.id
+        });
+
+        // Notify customer and restaurant about status change
+        const statusData = { orderId: order.id, status: order.status };
+        if (order.Customer) req.io.to(order.Customer.user_id).emit('ORDER_STATUS_UPDATED', statusData);
+        if (order.Restaurant) req.io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', statusData);
 
         res.json({ success: true, data: order });
     } catch (error) {

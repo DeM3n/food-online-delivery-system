@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
 import { notification } from 'antd';
+import socket from '../../socket';
 
 export default function DeliveryOrders() {
   const { profile, token } = useSelector(state => state.auth);
@@ -33,6 +34,29 @@ export default function DeliveryOrders() {
   useEffect(() => {
     if (profile?.id && token) {
       fetchDeliveries();
+
+      // Real-time notifications for drivers
+      socket.connect();
+      socket.emit('join_deliveries');
+
+      socket.on('AVAILABLE_DELIVERY', (data) => {
+        notification.info({
+          message: 'New Delivery Available!',
+          description: `A new order from ${data.restaurantName} is ready for pickup.`,
+          placement: 'topRight'
+        });
+        fetchDeliveries(); // Auto refresh
+      });
+
+      socket.on('ORDER_ACCEPTED', () => {
+        fetchDeliveries(); // Refresh to remove the order that was taken by someone else
+      });
+
+      return () => {
+        socket.off('AVAILABLE_DELIVERY');
+        socket.off('ORDER_ACCEPTED');
+        socket.disconnect();
+      };
     }
   }, [profile, token]);
 

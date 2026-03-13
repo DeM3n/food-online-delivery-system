@@ -1,40 +1,67 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
+import socket from '../../socket';
+import { notification } from 'antd';
 
 export default function RestaurantDashboard() {
-  const { profile } = useSelector(state => state.auth);
+  const { profile, user } = useSelector(state => state.auth);
   const [orders, setOrders] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchData = async () => {
+    try {
+      const [ordersRes, menuRes] = await Promise.all([
+        axios.get(`http://localhost:5000/api/orders/restaurant/${profile.id}`),
+        axios.get(`http://localhost:5000/api/menu/full/${profile.id}`)
+      ]);
+
+      if (ordersRes.data.success) {
+        setOrders(ordersRes.data.data);
+      }
+
+      if (menuRes.data.success) {
+        // Flatten items from categories
+        const items = menuRes.data.data.flatMap(cat => cat.MenuItems || []);
+        setMenuItems(items.sort((a, b) => b.rating - a.rating).slice(0, 5));
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (profile && profile.id) {
-      const fetchData = async () => {
-        try {
-          const [ordersRes, menuRes] = await Promise.all([
-            axios.get(`http://localhost:5000/api/orders/restaurant/${profile.id}`),
-            axios.get(`http://localhost:5000/api/menu/full/${profile.id}`)
-          ]);
-
-          if (ordersRes.data.success) {
-            setOrders(ordersRes.data.data);
-          }
-
-          if (menuRes.data.success) {
-            // Flatten items from categories
-            const items = menuRes.data.data.flatMap(cat => cat.MenuItems || []);
-            setMenuItems(items.sort((a, b) => b.rating - a.rating).slice(0, 5));
-          }
-        } catch (error) {
-          console.error('Error fetching dashboard data:', error);
-        } finally {
-          setLoading(false);
-        }
-      };
       fetchData();
+
+      // Real-time notifications
+      socket.connect();
+      socket.emit('join', user.id);
+
+      socket.on('NEW_ORDER', (data) => {
+        notification.success({
+          message: 'New Order Received!',
+          description: `You have a new order (#${data.orderId.slice(0, 8)}) for ${data.totalAmount.toLocaleString()}đ`,
+          placement: 'topRight',
+          duration: 10
+        });
+        fetchData(); // Auto refresh
+      });
+
+      socket.on('ORDER_STATUS_UPDATED', (data) => {
+        fetchData(); // Auto refresh
+      });
+
+      return () => {
+        socket.off('NEW_ORDER');
+        socket.off('ORDER_STATUS_UPDATED');
+        socket.disconnect();
+      };
     }
-  }, [profile]);
+  }, [profile, user]);
 
   const stats = [
     { label: "Total Orders", value: orders.length, color: "border-primary" },

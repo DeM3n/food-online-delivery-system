@@ -44,6 +44,8 @@ export default function CheckoutPage() {
                 payment_method: paymentMethod
             };
 
+            console.log('Sending order data:', orderData);
+
             const config = {
                 headers: { Authorization: `Bearer ${token}` }
             };

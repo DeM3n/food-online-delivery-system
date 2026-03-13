@@ -6,6 +6,7 @@ import axios from 'axios';
 import { loginSuccess } from '../../redux/slices/authSlice';
 import { notification } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
+import socket from '../../socket';
 
 const ProfileSchema = Yup.object().shape({
     full_name: Yup.string().required('Họ và tên là bắt buộc'),
@@ -27,15 +28,6 @@ export default function Profile() {
     const [favoriteFood, setFavoriteFood] = useState(null);
     const [addresses, setAddresses] = useState([]);
 
-    useEffect(() => {
-        if (user && user.role === 'customer') {
-            fetchUserOrders();
-            fetchFavoriteFood();
-            // In a real app, we'd fetch addresses here too
-            // For now let's mock one if profile exists or use profile.location if it was there
-        }
-    }, [user]);
-
     const fetchUserOrders = async () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -47,6 +39,26 @@ export default function Profile() {
             console.error('Error fetching orders:', error);
         }
     };
+
+    useEffect(() => {
+        if (user && user.role === 'customer') {
+            fetchUserOrders();
+            fetchFavoriteFood();
+            
+            // Real-time status updates
+            socket.on('ORDER_STATUS_UPDATED', (data) => {
+                notification.info({
+                    message: 'Order Update',
+                    description: `Your order #${data.orderId.slice(0, 8)} is now ${data.status.replace(/_/g, ' ')}!`
+                });
+                fetchUserOrders(); // Auto refresh list
+            });
+
+            return () => {
+                socket.off('ORDER_STATUS_UPDATED');
+            };
+        }
+    }, [user]);
 
     const fetchFavoriteFood = async () => {
         try {

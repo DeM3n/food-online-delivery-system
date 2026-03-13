@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { io } from 'socket.io-client';
 import axios from 'axios';
+import socket from './socket';
 import { loginSuccess, logout as logoutAction } from './redux/slices/authSlice';
 import { fetchCart, resetCartState } from './redux/slices/cartSlice';
 
@@ -29,8 +29,6 @@ import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
 import Profile from './pages/Auth/Profile';
 
-// Socket Connection
-const socket = io('http://localhost:5000'); // Link to backend
 
 function App() {
   const { user, isAuthenticated } = useSelector((state) => state.auth);
@@ -93,12 +91,14 @@ function App() {
       dispatch(fetchCart());
     }
     
+    socket.connect();
     socket.on('connect', () => {
       console.log('Connected to real-time server');
     });
 
     return () => {
       socket.off('connect');
+      socket.disconnect();
     };
   }, [token, user, dispatch]);
 
