@@ -78,7 +78,7 @@ router.get('/', optionalProtect, getCart);
  *       401:
  *         description: Unauthorized
  */
-router.post('/items', protect, addItemToCart);
+router.post('/items', optionalProtect, addItemToCart);
 
 /**
  * @openapi
