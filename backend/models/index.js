@@ -10,6 +10,8 @@ const Admin = require('./Admin');
 const CustomerSupport = require('./CustomerSupport');
 const AuthOtp = require('./AuthOtp');
 const Content = require('./Content');
+const GuestCartSession = require('./GuestCartSession');
+const GuestCartItem = require('./GuestCartItem');
 
 const Address = require('./Address');
 const MenuCategory = require('./MenuCategory');
@@ -123,6 +125,12 @@ AuthSession.belongsTo(User, { foreignKey: 'user_id' });
 User.hasMany(AuthOtp, { foreignKey: 'user_id' });
 AuthOtp.belongsTo(User, { foreignKey: 'user_id' });
 
+GuestCartSession.hasMany(GuestCartItem, { foreignKey: 'guest_cart_session_id' });
+GuestCartItem.belongsTo(GuestCartSession, { foreignKey: 'guest_cart_session_id' });
+
+MenuItem.hasMany(GuestCartItem, { foreignKey: 'menu_item_id' });
+GuestCartItem.belongsTo(MenuItem, { foreignKey: 'menu_item_id' });
+
 module.exports = {
   sequelize,
   User,
@@ -146,4 +154,6 @@ module.exports = {
   AuthSession,
   AuthOtp,
   Content,
+  GuestCartSession,
+  GuestCartItem,
 };

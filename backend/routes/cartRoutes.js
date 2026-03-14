@@ -1,14 +1,26 @@
 const express = require('express');
 const router = express.Router();
-const { getCart, addItemToCart, updateItemQuantity, removeItem, clearCart } = require('../controllers/cartController');
+
+const {
+  getCart,
+  addItemToCart,
+  updateItemQuantity,
+  removeItem,
+  clearCart
+} = require('../controllers/cartController');
+
 const { protect } = require('../middleware/authMiddleware');
+const { optionalProtect } = require('../middleware/cartOptionalAuth');
 
-router.use(protect); // All cart routes require authentication
+// Public create/get active cart
+// - Guest: x-cart-token hoặc cart_token query
+// - Customer: Bearer token
+router.get('/', optionalProtect, getCart);
 
-router.get('/', getCart);
-router.post('/items', addItemToCart);
-router.put('/items/:itemId', updateItemQuantity);
-router.delete('/items/:itemId', removeItem);
-router.delete('/', clearCart);
+// Customer-only cart mutations
+router.post('/items', protect, addItemToCart);
+router.put('/items/:itemId', protect, updateItemQuantity);
+router.delete('/items/:itemId', protect, removeItem);
+router.delete('/', protect, clearCart);
 
 module.exports = router;
