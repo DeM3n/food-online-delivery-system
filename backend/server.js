@@ -37,6 +37,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const homeRoutes = require('./routes/homeRoutes');
+const categoriesRoutes = require('./routes/categoriesRoutes');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -46,6 +47,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/home', homeRoutes);
+app.use('/api/categories', categoriesRoutes);
 
 // Socket.io Connection Logic
 io.on('connection', (socket) => {
