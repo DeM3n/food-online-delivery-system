@@ -48,7 +48,7 @@ router.get('/', optionalProtect, getCart);
  *     tags:
  *       - Cart
  *     summary: Add item to cart
- *     description: Adds an item to the authenticated customer's cart.
+ *     description: Validates product visibility and availability, validates quantity, then adds a new item or increments quantity in the authenticated customer's cart.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -63,22 +63,29 @@ router.get('/', optionalProtect, getCart);
  *             properties:
  *               menu_item_id:
  *                 type: string
+ *                 example: 550e8400-e29b-41d4-a716-446655440000
  *               quantity:
  *                 type: integer
  *                 example: 2
  *               restaurant_id:
  *                 type: string
+ *                 nullable: true
+ *                 example: 550e8400-e29b-41d4-a716-446655440001
  *               options:
  *                 type: object
+ *                 nullable: true
  *     responses:
  *       200:
- *         description: Item added to cart
+ *         description: Item added to cart successfully
  *       400:
- *         description: Invalid input or unavailable item
+ *         description: Invalid input, unavailable product, hidden product, or invalid quantity
  *       401:
  *         description: Unauthorized
+ *       404:
+ *         description: Customer or product not found
  */
-router.post('/items', optionalProtect, addItemToCart);
+// Add item
+router.post('/items', protect, addItemToCart);
 
 /**
  * @openapi
@@ -87,6 +94,7 @@ router.post('/items', optionalProtect, addItemToCart);
  *     tags:
  *       - Cart
  *     summary: Update cart item quantity
+ *     description: Updates cart item quantity directly. Supports increasing, decreasing, direct quantity input, and removing the item when quantity is set to 0.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -95,6 +103,7 @@ router.post('/items', optionalProtect, addItemToCart);
  *         required: true
  *         schema:
  *           type: string
+ *         description: Cart item id
  *     requestBody:
  *       required: true
  *       content:
@@ -110,11 +119,16 @@ router.post('/items', optionalProtect, addItemToCart);
  *     responses:
  *       200:
  *         description: Quantity updated successfully
+ *       400:
+ *         description: Invalid quantity or unavailable product
  *       401:
  *         description: Unauthorized
  *       404:
- *         description: Cart item not found
+ *         description: Customer, cart, cart item, or product not found
+ *       500:
+ *         description: Server error
  */
+// Update item quantity: PATCH
 router.put('/items/:itemId', protect, updateItemQuantity);
 
 /**
@@ -124,6 +138,7 @@ router.put('/items/:itemId', protect, updateItemQuantity);
  *     tags:
  *       - Cart
  *     summary: Remove item from cart
+ *     description: Removes a cart item from the authenticated customer's cart.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -132,6 +147,7 @@ router.put('/items/:itemId', protect, updateItemQuantity);
  *         required: true
  *         schema:
  *           type: string
+ *         description: Cart item id
  *     responses:
  *       200:
  *         description: Item removed successfully
@@ -139,7 +155,10 @@ router.put('/items/:itemId', protect, updateItemQuantity);
  *         description: Unauthorized
  *       404:
  *         description: Cart item not found
+ *       500:
+ *         description: Server error
  */
+// Remove item
 router.delete('/items/:itemId', protect, removeItem);
 
 /**
@@ -149,6 +168,7 @@ router.delete('/items/:itemId', protect, removeItem);
  *     tags:
  *       - Cart
  *     summary: Clear cart
+ *     description: Removes all items from the authenticated customer's cart and resets restaurant binding.
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -156,7 +176,12 @@ router.delete('/items/:itemId', protect, removeItem);
  *         description: Cart cleared successfully
  *       401:
  *         description: Unauthorized
+ *       404:
+ *         description: Customer not found
+ *       500:
+ *         description: Server error
  */
+// Clear cart
 router.delete('/', protect, clearCart);
 
 module.exports = router;
