@@ -4,6 +4,8 @@ const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
 const { sequelize } = require('./models');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
 
 // Load env vars
 dotenv.config();
@@ -54,6 +56,7 @@ app.use('/api/categories', categoriesRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/contents', contentsRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Socket.io Connection Logic
 io.on('connection', (socket) => {
