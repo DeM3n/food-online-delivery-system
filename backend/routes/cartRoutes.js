@@ -18,24 +18,26 @@ const { optionalProtect } = require('../middleware/cartOptionalAuth');
  *   get:
  *     tags:
  *       - Cart
- *     summary: Get active cart
- *     description: Returns the active cart for a guest or authenticated customer. Guest cart can be resolved by x-cart-token or cart_token query, customer cart by bearer token.
+ *     summary: Get active cart / cart details
+ *     description: Returns the active cart. Guest cart can be resolved by cart token, customer cart by bearer token.
  *     parameters:
  *       - in: header
  *         name: x-cart-token
+ *         required: false
  *         schema:
  *           type: string
- *         required: false
  *         description: Guest cart token
  *       - in: query
  *         name: cart_token
+ *         required: false
  *         schema:
  *           type: string
- *         required: false
  *         description: Guest cart token as query fallback
  *     responses:
  *       200:
- *         description: Active cart retrieved successfully
+ *         description: Cart details retrieved successfully
+ *       404:
+ *         description: Customer not found
  *       500:
  *         description: Server error
  */
@@ -63,14 +65,12 @@ router.get('/', optionalProtect, getCart);
  *             properties:
  *               menu_item_id:
  *                 type: string
- *                 example: 550e8400-e29b-41d4-a716-446655440000
  *               quantity:
  *                 type: integer
  *                 example: 2
  *               restaurant_id:
  *                 type: string
  *                 nullable: true
- *                 example: 550e8400-e29b-41d4-a716-446655440001
  *               options:
  *                 type: object
  *                 nullable: true
@@ -84,7 +84,6 @@ router.get('/', optionalProtect, getCart);
  *       404:
  *         description: Customer or product not found
  */
-// Add item
 router.post('/items', protect, addItemToCart);
 
 /**
@@ -128,7 +127,6 @@ router.post('/items', protect, addItemToCart);
  *       500:
  *         description: Server error
  */
-// Update item quantity: PATCH
 router.put('/items/:itemId', protect, updateItemQuantity);
 
 /**
@@ -137,8 +135,8 @@ router.put('/items/:itemId', protect, updateItemQuantity);
  *   delete:
  *     tags:
  *       - Cart
- *     summary: Remove item from cart
- *     description: Removes a cart item from the authenticated customer's cart.
+ *     summary: Remove cart item
+ *     description: Removes a cart item from the authenticated customer's cart and returns updated cart details including subtotal and total.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -154,21 +152,20 @@ router.put('/items/:itemId', protect, updateItemQuantity);
  *       401:
  *         description: Unauthorized
  *       404:
- *         description: Cart item not found
+ *         description: Customer, cart, or cart item not found
  *       500:
  *         description: Server error
  */
-// Remove item
 router.delete('/items/:itemId', protect, removeItem);
 
 /**
  * @openapi
- * /api/cart:
+ * /api/cart/items:
  *   delete:
  *     tags:
  *       - Cart
  *     summary: Clear cart
- *     description: Removes all items from the authenticated customer's cart and resets restaurant binding.
+ *     description: Removes all items from the authenticated customer's cart and returns an empty cart summary.
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -181,7 +178,9 @@ router.delete('/items/:itemId', protect, removeItem);
  *       500:
  *         description: Server error
  */
-// Clear cart
+router.delete('/items', protect, clearCart);
+
+// Optional backward-compatible alias if FE still calls DELETE /api/cart
 router.delete('/', protect, clearCart);
 
 module.exports = router;

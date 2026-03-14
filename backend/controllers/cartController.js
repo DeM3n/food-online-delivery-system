@@ -686,12 +686,46 @@ exports.updateItemQuantity = async (req, res) => {
   }
 };
 
-// @desc    Remove item from cart
+
+
+
+// Add / replace these methods in backend/controllers/cartController.js
+
+// @desc    Remove cart item and return updated cart details
 // @route   DELETE /api/cart/items/:itemId
 // @access  Private
 exports.removeItem = async (req, res) => {
   try {
-    const cartItem = await CartItem.findByPk(req.params.itemId);
+    const itemId = req.params.itemId;
+
+    const customer = await Customer.findOne({
+      where: { user_id: req.user.id }
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer not found'
+      });
+    }
+
+    const cart = await Cart.findOne({
+      where: { customer_id: customer.id }
+    });
+
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cart not found'
+      });
+    }
+
+    const cartItem = await CartItem.findOne({
+      where: {
+        id: itemId,
+        cart_id: cart.id
+      }
+    });
 
     if (!cartItem) {
       return res.status(404).json({
@@ -702,9 +736,50 @@ exports.removeItem = async (req, res) => {
 
     await cartItem.destroy();
 
+    const refreshedCart = await Cart.findOne({
+      where: { id: cart.id },
+      include: [
+        {
+          model: CartItem,
+          include: [
+            {
+              model: MenuItem,
+              include: [
+                {
+                  model: Restaurant,
+                  attributes: ['id', 'name', 'is_open', 'rating'],
+                  required: false
+                },
+                {
+                  model: MenuCategory,
+                  attributes: ['id', 'name'],
+                  required: false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    });
+
+    const cartDetails = buildCartDetailResponse({
+      cart: refreshedCart,
+      customerId: customer.id
+    });
+
+    if ((cartDetails.items || []).length === 0 && cart.restaurant_id) {
+      cart.restaurant_id = null;
+      await cart.save();
+      cartDetails.restaurant_id = null;
+    }
+
     return res.status(200).json({
       success: true,
-      message: 'Item removed'
+      message: 'Item removed successfully',
+      data: {
+        removed_item_id: itemId,
+        cart: cartDetails
+      }
     });
   } catch (error) {
     console.error('Remove cart item error:', error);
@@ -715,8 +790,8 @@ exports.removeItem = async (req, res) => {
   }
 };
 
-// @desc    Clear cart
-// @route   DELETE /api/cart
+// @desc    Clear cart and return empty cart details
+// @route   DELETE /api/cart/items
 // @access  Private
 exports.clearCart = async (req, res) => {
   try {
@@ -735,18 +810,51 @@ exports.clearCart = async (req, res) => {
       where: { customer_id: customer.id }
     });
 
-    if (cart) {
-      await CartItem.destroy({
-        where: { cart_id: cart.id }
+    if (!cart) {
+      return res.status(200).json({
+        success: true,
+        message: 'Cart already empty',
+        data: {
+          cart: {
+            cart_id: null,
+            customer_id: customer.id,
+            restaurant_id: null,
+            items: [],
+            summary: {
+              item_count: 0,
+              total_quantity: 0,
+              cart_subtotal: 0,
+              cart_total: 0
+            }
+          }
+        }
       });
-
-      cart.restaurant_id = null;
-      await cart.save();
     }
+
+    await CartItem.destroy({
+      where: { cart_id: cart.id }
+    });
+
+    cart.restaurant_id = null;
+    await cart.save();
 
     return res.status(200).json({
       success: true,
-      message: 'Cart cleared'
+      message: 'Cart cleared successfully',
+      data: {
+        cart: {
+          cart_id: cart.id,
+          customer_id: customer.id,
+          restaurant_id: null,
+          items: [],
+          summary: {
+            item_count: 0,
+            total_quantity: 0,
+            cart_subtotal: 0,
+            cart_total: 0
+          }
+        }
+      }
     });
   } catch (error) {
     console.error('Clear cart error:', error);
@@ -756,4 +864,3 @@ exports.clearCart = async (req, res) => {
     });
   }
 };
-
