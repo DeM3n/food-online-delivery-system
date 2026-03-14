@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { clearCartAsync } from '../../redux/slices/cartSlice';
-import { notification } from 'antd';
+import { clearCartAsync, fetchCart } from '../../redux/slices/cartSlice';
+import { notification, Modal } from 'antd';
 import { CreditCardOutlined, MoneyCollectOutlined, HomeOutlined, PhoneOutlined, MessageOutlined } from '@ant-design/icons';
 
 export default function CheckoutPage() {
@@ -21,7 +21,7 @@ export default function CheckoutPage() {
     const deliveryFee = 15000;
     const grandTotal = total + deliveryFee;
 
-    const handlePlaceOrder = async () => {
+    const handlePlaceOrder = async (force = false) => {
         if (!address.trim() || !phone.trim()) {
             notification.warning({
                 message: 'Incomplete Information',
@@ -36,21 +36,18 @@ export default function CheckoutPage() {
             const orderData = {
                 restaurant_id: restaurantId,
                 items,
-                subtotal: total,
                 delivery_fee: deliveryFee,
-                total_amount: grandTotal,
                 address_details: address,
                 notes,
-                payment_method: paymentMethod
+                payment_method: paymentMethod,
+                force_proceed: force
             };
-
-            console.log('Sending order data:', orderData);
 
             const config = {
                 headers: { Authorization: `Bearer ${token}` }
             };
 
-            const response = await axios.post('http://localhost:5000/api/orders', orderData, config);
+            const response = await axios.post('http://localhost:5001/api/orders', orderData, config);
 
             if (response.data.success) {
                 notification.success({
@@ -59,15 +56,37 @@ export default function CheckoutPage() {
                     placement: 'topRight'
                 });
                 dispatch(clearCartAsync());
-                navigate('/customer'); // Redirect to Home after successful order
+                navigate('/customer'); 
             }
         } catch (error) {
             console.error('Checkout error:', error);
-            notification.error({
-                message: 'Order Error',
-                description: error.response?.data?.message || 'There was an error placing your order. Please try again.',
-                placement: 'topRight'
-            });
+            if (error.response?.data?.type === 'AVAILABILITY_CONFLICT') {
+                const unavailableItems = error.response.data.unavailableItems || [];
+                Modal.confirm({
+                    title: 'Availability Conflict',
+                    content: (
+                        <div>
+                            <p>The following items are no longer available:</p>
+                            <ul className="list-disc ml-5 text-red-500 font-medium">
+                                {unavailableItems.map(item => <li key={item.id}>{item.name}</li>)}
+                            </ul>
+                            <p className="mt-4">Do you want to proceed with the remaining available items? Your total will be recalculated.</p>
+                        </div>
+                    ),
+                    okText: 'Yes, Proceed',
+                    cancelText: 'Cancel Order',
+                    onOk: () => {
+                        dispatch(fetchCart()); // Refresh totals
+                        handlePlaceOrder(true);
+                    }
+                });
+            } else {
+                notification.error({
+                    message: 'Order Error',
+                    description: error.response?.data?.message || 'There was an error placing your order. Please try again.',
+                    placement: 'topRight'
+                });
+            }
         } finally {
             setLoading(false);
         }
@@ -212,7 +231,7 @@ export default function CheckoutPage() {
 
                         <button 
                             className="btn-primary w-full py-4 text-xl font-bold disabled:opacity-50"
-                            onClick={handlePlaceOrder}
+                            onClick={() => handlePlaceOrder(false)}
                             disabled={loading}
                         >
                             {loading ? 'Processing...' : 'PLACE ORDER'}

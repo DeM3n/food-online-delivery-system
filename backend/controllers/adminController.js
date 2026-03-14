@@ -1,28 +1,11 @@
-const { User, Restaurant, DeliveryPartner, Order, sequelize } = require('../models');
+const adminService = require('../services/adminService');
 
 exports.getSystemStats = async (req, res) => {
     try {
-        const [userCount, restaurantCount, driverCount, orderStats] = await Promise.all([
-            User.count(),
-            Restaurant.count(),
-            DeliveryPartner.count(),
-            Order.findAll({
-                attributes: [
-                    [sequelize.fn('SUM', sequelize.col('total_amount')), 'totalRevenue'],
-                    [sequelize.fn('COUNT', sequelize.col('id')), 'totalOrders']
-                ]
-            })
-        ]);
-
+        const stats = await adminService.getSystemStats();
         res.json({
             success: true,
-            data: {
-                totalUsers: userCount,
-                activeRestaurants: restaurantCount,
-                deliveryPartners: driverCount,
-                totalRevenue: orderStats[0]?.dataValues.totalRevenue || 0,
-                totalOrders: orderStats[0]?.dataValues.totalOrders || 0
-            }
+            data: stats
         });
     } catch (error) {
         console.error(error);

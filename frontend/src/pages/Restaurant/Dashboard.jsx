@@ -13,8 +13,8 @@ export default function RestaurantDashboard() {
   const fetchData = async () => {
     try {
       const [ordersRes, menuRes] = await Promise.all([
-        axios.get(`http://localhost:5000/api/orders/restaurant/${profile.id}`),
-        axios.get(`http://localhost:5000/api/menu/full/${profile.id}`)
+        axios.get(`http://localhost:5001/api/orders/restaurant/me`),
+        axios.get(`http://localhost:5001/api/menu/full/${profile.id}`)
       ]);
 
       if (ordersRes.data.success) {

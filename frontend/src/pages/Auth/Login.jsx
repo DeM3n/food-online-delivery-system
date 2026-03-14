@@ -45,7 +45,7 @@ export default function Login() {
             try {
               setError('');
               // Connecting to real backend
-              const response = await axios.post('http://localhost:5000/api/auth/login', values);
+              const response = await axios.post('http://localhost:5001/api/auth/login', values);
               const { data } = response.data;
 
               dispatch(loginSuccess({

@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { addToCartAsync } from '../../redux/slices/cartSlice';
 import axios from 'axios';
 import { notification } from 'antd';
+import socket from '../../socket';
 
 export default function RestaurantMenu() {
     const { restaurantId } = useParams();
@@ -18,8 +19,8 @@ export default function RestaurantMenu() {
         const fetchMenuData = async () => {
             try {
                 const [resResponse, menuResponse] = await Promise.all([
-                    axios.get(`http://localhost:5000/api/restaurants/${restaurantId}`),
-                    axios.get(`http://localhost:5000/api/menu/full/${restaurantId}`)
+                    axios.get(`http://localhost:5001/api/restaurants/${restaurantId}`),
+                    axios.get(`http://localhost:5001/api/menu/full/${restaurantId}`)
                 ]);
 
                 if (resResponse.data.success) {
@@ -35,6 +36,24 @@ export default function RestaurantMenu() {
             }
         };
         fetchMenuData();
+
+        // Real-time menu updates
+        socket.on('MENU_ITEM_UPDATED', (data) => {
+            if (data.restaurantId === restaurantId) {
+                setMenu(prevMenu => prevMenu.map(category => ({
+                    ...category,
+                    MenuItems: category.MenuItems?.map(item => 
+                        item.id === data.itemId 
+                            ? { ...item, is_available: data.isAvailable } 
+                            : item
+                    )
+                })));
+            }
+        });
+
+        return () => {
+            socket.off('MENU_ITEM_UPDATED');
+        };
     }, [restaurantId]);
 
     const handleAdd = async (item) => {
@@ -115,7 +134,12 @@ export default function RestaurantMenu() {
                                 <div className="space-y-4">
                                     {category.MenuItems && category.MenuItems.length > 0 ? (
                                         category.MenuItems.map(item => (
-                                            <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4 hover:shadow-md transition-shadow">
+                                            <div key={item.id} className={`bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4 hover:shadow-md transition-shadow relative overflow-hidden ${!item.is_available ? 'grayscale-[0.5] opacity-80' : ''}`}>
+                                                {!item.is_available && (
+                                                    <div className="absolute top-2 right-2 z-10">
+                                                        <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm uppercase tracking-tighter">OOO</span>
+                                                    </div>
+                                                )}
                                                 <img
                                                     src={item.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop'}
                                                     className="w-24 h-24 rounded-xl object-cover"
@@ -124,15 +148,21 @@ export default function RestaurantMenu() {
                                                 <div className="flex-1">
                                                     <h3 className="text-lg font-bold text-gray-800">{item.name}</h3>
                                                     <p className="text-gray-500 text-sm line-clamp-2 mt-1">{item.description}</p>
-                                                    <div className="flex justify-between items-center mt-3">
-                                                        <span className="text-xl font-bold text-primary">{Number(item.price).toLocaleString()}đ</span>
-                                                        <button
-                                                            onClick={() => handleAdd(item)}
-                                                            className="bg-orange-100 text-primary px-4 py-1.5 rounded-full font-bold hover:bg-primary hover:text-white transition-colors"
-                                                        >
-                                                            Add +
-                                                        </button>
-                                                    </div>
+                                                        <div className="flex justify-between items-center mt-3">
+                                                            <span className="text-xl font-bold text-primary">{Number(item.price).toLocaleString()}đ</span>
+                                                            {item.is_available ? (
+                                                                <button
+                                                                    onClick={() => handleAdd(item)}
+                                                                    className="bg-orange-100 text-primary px-4 py-1.5 rounded-full font-bold hover:bg-primary hover:text-white transition-colors"
+                                                                >
+                                                                    Add +
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-red-500 font-bold text-sm bg-red-50 px-3 py-1 rounded-full border border-red-100 italic">
+                                                                    Out of Order
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                 </div>
                                             </div>
                                         ))

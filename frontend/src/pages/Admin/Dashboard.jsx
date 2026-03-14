@@ -8,7 +8,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/admin/stats');
+        const response = await axios.get('http://localhost:5001/api/admin/stats');
         if (response.data.success) {
           setStats(response.data.data);
         }

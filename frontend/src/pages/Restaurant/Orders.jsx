@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
 import { notification } from 'antd';
-import { CheckCircleOutlined, SyncOutlined, ClockCircleOutlined, CarOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, SyncOutlined, ClockCircleOutlined, CarOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import socket from '../../socket';
 
 export default function RestaurantOrders() {
@@ -12,7 +12,8 @@ export default function RestaurantOrders() {
 
   const fetchOrders = async () => {
     try {
-      const { data } = await axios.get(`http://localhost:5000/api/orders/restaurant/${profile.id}`);
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const { data } = await axios.get(`http://localhost:5001/api/orders/restaurant/me`, config);
       if (data.success) {
         setOrders(data.data);
       }
@@ -54,7 +55,7 @@ export default function RestaurantOrders() {
   const updateStatus = async (orderId, newStatus) => {
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const { data } = await axios.put(`http://localhost:5000/api/orders/${orderId}/status`, { status: newStatus }, config);
+      const { data } = await axios.put(`http://localhost:5001/api/orders/${orderId}/status`, { status: newStatus }, config);
       if (data.success) {
         notification.success({ message: `Order marked as ${newStatus}` });
         fetchOrders(); // Refresh
@@ -67,11 +68,11 @@ export default function RestaurantOrders() {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'pending': return <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold uppercase"><ClockCircleOutlined className="mr-1"/> Pending</span>;
-      case 'confirmed': return <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold uppercase"><CheckCircleOutlined className="mr-1"/> Confirmed</span>;
+      case 'accepted': return <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold uppercase"><CheckCircleOutlined className="mr-1"/> Accepted</span>;
       case 'preparing': return <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-bold uppercase"><SyncOutlined spin className="mr-1"/> Preparing</span>;
-      case 'ready_for_pickup': return <span className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-xs font-bold uppercase"><CheckCircleOutlined className="mr-1"/> Ready</span>;
-      case 'out_for_delivery': return <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold uppercase"><CarOutlined className="mr-1"/> Delivering</span>;
+      case 'picked_up': return <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold uppercase"><CarOutlined className="mr-1"/> On the Way</span>;
       case 'delivered': return <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase"><CheckCircleOutlined className="mr-1"/> Delivered</span>;
+      case 'cancelled': return <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold uppercase"><CloseCircleOutlined className="mr-1"/> Cancelled</span>;
       default: return <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-bold uppercase">{status}</span>;
     }
   };
@@ -116,13 +117,16 @@ export default function RestaurantOrders() {
                   <td className="p-4">
                     <div className="flex flex-col gap-2">
                       {order.status === 'pending' && (
-                        <button onClick={() => updateStatus(order.id, 'confirmed')} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold transition-colors">Accept Order</button>
+                        <button onClick={() => updateStatus(order.id, 'accepted')} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold transition-colors">Accept Order</button>
                       )}
-                      {order.status === 'confirmed' && (
+                      {order.status === 'accepted' && (
                         <button onClick={() => updateStatus(order.id, 'preparing')} className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-bold transition-colors">Start Preparing</button>
                       )}
-                      {order.status === 'preparing' && (
-                        <button onClick={() => updateStatus(order.id, 'ready_for_pickup')} className="bg-pink-500 hover:bg-pink-600 text-white px-3 py-1 rounded text-xs font-bold transition-colors">Ready for Pickup</button>
+                      {order.status === 'preparing' && !order.delivery_partner_id && (
+                        <div className="text-[10px] text-orange-600 font-bold italic">Waiting for Driver...</div>
+                      )}
+                      {order.status === 'cancelled' && (
+                        <div className="text-[10px] text-red-500 font-bold">CANCELLED</div>
                       )}
                     </div>
                   </td>

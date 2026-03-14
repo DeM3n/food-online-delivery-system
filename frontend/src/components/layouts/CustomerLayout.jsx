@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../redux/slices/authSlice';
 import { resetCartState } from '../../redux/slices/cartSlice';
 import { Badge } from 'antd';
-import { UserOutlined, ShoppingCartOutlined, HomeOutlined, ShopOutlined } from '@ant-design/icons';
+import { UserOutlined, ShoppingCartOutlined, HomeOutlined, ShopOutlined, ClockCircleOutlined } from '@ant-design/icons';
 
 export default function CustomerLayout() {
   const dispatch = useDispatch();
@@ -40,6 +40,10 @@ export default function CustomerLayout() {
           <Link to="/customer/restaurants" className="hover:text-primary transition-colors flex items-center gap-1">
             <ShopOutlined className="text-xl" />
             <span>Restaurants</span>
+          </Link>
+          <Link to="/customer/tracking" className="hover:text-primary transition-colors flex items-center gap-1">
+            <ClockCircleOutlined className="text-xl" />
+            <span>Order Tracking</span>
           </Link>
           <Link to="/customer/profile" className="hover:text-primary transition-colors flex items-center gap-1">
             <UserOutlined className="text-xl" />

@@ -18,9 +18,11 @@ import RestaurantList from './pages/Customer/RestaurantList';
 import RestaurantMenu from './pages/Customer/RestaurantMenu';
 import CartPage from './pages/Customer/CartPage';
 import CheckoutPage from './pages/Customer/CheckoutPage';
+import OrderTracking from './pages/Customer/OrderTracking';
 
 import RestaurantDashboard from './pages/Restaurant/Dashboard';
 import RestaurantOrders from './pages/Restaurant/Orders';
+import MenuManagement from './pages/Restaurant/MenuManagement';
 import DeliveryDashboard from './pages/Delivery/Dashboard';
 import DeliveryOrders from './pages/Delivery/Orders';
 import AdminDashboard from './pages/Admin/Dashboard';
@@ -42,7 +44,7 @@ function App() {
           const config = {
             headers: { Authorization: `Bearer ${token}` }
           };
-          const response = await axios.get('http://localhost:5000/api/auth/profile', config);
+          const response = await axios.get('http://localhost:5001/api/auth/profile', config);
           if (response.data.success) {
             const data = response.data.data;
             // Determine which profile is active
@@ -94,7 +96,15 @@ function App() {
     socket.connect();
     socket.on('connect', () => {
       console.log('Connected to real-time server');
+      if (user && user.id) {
+        socket.emit('join', user.id);
+      }
     });
+
+    // If user changes/authenticates, ensure they join their room
+    if (user && user.id) {
+      socket.emit('join', user.id);
+    }
 
     return () => {
       socket.off('connect');
@@ -115,13 +125,14 @@ function App() {
           <Route path="restaurant/:restaurantId" element={<RestaurantMenu />} />
           <Route path="cart" element={<CartPage />} />
           <Route path="checkout" element={<CheckoutPage />} />
+          <Route path="tracking" element={<OrderTracking />} />
           <Route path="profile" element={<Profile />} />
         </Route>
 
         {/* Restaurant Routes */}
         <Route path="/restaurant" element={<RestaurantLayout />}>
           <Route index element={<RestaurantDashboard />} />
-          <Route path="menu" element={<div>Menu Management</div>} />
+          <Route path="menu" element={<MenuManagement />} />
           <Route path="orders" element={<RestaurantOrders />} />
           <Route path="profile" element={<Profile />} />
         </Route>

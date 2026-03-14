@@ -25,13 +25,13 @@ export default function Profile() {
     const dispatch = useDispatch();
     const [loading, setLoading] = useState(false);
     const [orders, setOrders] = useState([]);
-    const [favoriteFood, setFavoriteFood] = useState(null);
+    const [favoriteRestaurant, setFavoriteRestaurant] = useState(null);
     const [addresses, setAddresses] = useState([]);
 
     const fetchUserOrders = async () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.get(`http://localhost:5000/api/orders/user/${user.id}`, config);
+            const response = await axios.get(`http://localhost:5001/api/orders/me`, config);
             if (response.data.success) {
                 setOrders(response.data.data);
             }
@@ -43,7 +43,7 @@ export default function Profile() {
     useEffect(() => {
         if (user && user.role === 'customer') {
             fetchUserOrders();
-            fetchFavoriteFood();
+            fetchFavoriteRestaurant();
             
             // Real-time status updates
             socket.on('ORDER_STATUS_UPDATED', (data) => {
@@ -60,15 +60,15 @@ export default function Profile() {
         }
     }, [user]);
 
-    const fetchFavoriteFood = async () => {
+    const fetchFavoriteRestaurant = async () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.get(`http://localhost:5000/api/orders/user/${user.id}/favorite`, config);
+            const response = await axios.get(`http://localhost:5001/api/orders/me/favorite`, config);
             if (response.data.success) {
-                setFavoriteFood(response.data.data);
+                setFavoriteRestaurant(response.data.data);
             }
         } catch (error) {
-            console.error('Error fetching favorite food:', error);
+            console.error('Error fetching favorite restaurant:', error);
         }
     };
 
@@ -116,7 +116,7 @@ export default function Profile() {
                                             headers: { Authorization: `Bearer ${token}` }
                                         };
 
-                                        const response = await axios.put('http://localhost:5000/api/auth/profile', values, config);
+                                        const response = await axios.put('http://localhost:5001/api/auth/profile', values, config);
 
                                         if (response.data.success) {
                                             const updatedData = response.data.data;
@@ -223,18 +223,19 @@ export default function Profile() {
                                         <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                                             <span className="text-2xl">🏆</span> Monthly Favorite
                                         </h3>
-                                        {favoriteFood ? (
+                                        {favoriteRestaurant ? (
                                             <div className="flex items-center gap-4">
                                                 <div className="w-16 h-16 rounded-xl overflow-hidden shadow-sm">
                                                     <img
-                                                        src={favoriteFood.MenuItem.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100'}
-                                                        alt={favoriteFood.MenuItem.name}
+                                                        src={favoriteRestaurant.image_url || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=100'}
+                                                        alt={favoriteRestaurant.name}
                                                         className="w-full h-full object-cover"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <p className="font-bold text-gray-800">{favoriteFood.MenuItem.name}</p>
-                                                    <p className="text-sm text-gray-500">Ordered {favoriteFood.dataValues?.count || favoriteFood.count} times this month</p>
+                                                    <p className="font-bold text-gray-800">{favoriteRestaurant.name}</p>
+                                                    <p className="text-xs text-primary mb-1">{favoriteRestaurant.cuisine_type || 'Restaurant'}</p>
+                                                    <p className="text-sm text-gray-500">Ordered {favoriteRestaurant.count} times this month</p>
                                                 </div>
                                             </div>
                                         ) : (

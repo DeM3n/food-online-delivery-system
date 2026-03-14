@@ -11,7 +11,7 @@ export default function DeliveryDashboard() {
     const fetchHistory = async () => {
       try {
         const config = { headers: { Authorization: `Bearer ${token}` } };
-        const { data } = await axios.get(`http://localhost:5000/api/orders/driver/${profile.id}/history`, config);
+        const { data } = await axios.get(`http://localhost:5001/api/orders/driver/me/history`, config);
         
         if (data.success) {
           setHistory(data.data);
@@ -42,7 +42,7 @@ export default function DeliveryDashboard() {
 
   // Bonus KPI Calculation
   const dailyOrdersCount = todayOrders.length;
-  const kpiTarget = 10;
+  const kpiTarget = 15;
   
   const milestones = [
     { count: 5, reward: '10,000đ' },
@@ -68,22 +68,14 @@ export default function DeliveryDashboard() {
       </div>
 
       {/* Main Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-soft border-l-4 border-primary">
-          <h3 className="text-gray-500 font-medium text-sm uppercase tracking-wide">Orders Today</h3>
+          <h3 className="text-gray-500 font-medium text-sm uppercase tracking-wide text-primary">Orders Completed Today</h3>
           <p className="text-3xl font-bold mt-2 text-gray-800">{dailyOrdersCount}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow-soft border-l-4 border-green-500">
-          <h3 className="text-gray-500 font-medium text-sm uppercase tracking-wide">Earnings Today</h3>
+          <h3 className="text-gray-500 font-medium text-sm uppercase tracking-wide text-green-600">Earnings Today</h3>
           <p className="text-3xl font-bold mt-2 text-gray-800">{todayEarnings.toLocaleString()}đ</p>
-        </div>
-        <div className="bg-white p-6 rounded-2xl shadow-soft border-l-4 border-orange-300">
-          <h3 className="text-gray-500 font-medium text-sm uppercase tracking-wide">Orders This Month</h3>
-          <p className="text-3xl font-bold mt-2 text-gray-800">{monthOrders.length}</p>
-        </div>
-        <div className="bg-white p-6 rounded-2xl shadow-soft border-l-4 border-blue-400">
-          <h3 className="text-gray-500 font-medium text-sm uppercase tracking-wide">Earnings This Month</h3>
-          <p className="text-3xl font-bold mt-2 text-gray-800">{monthEarnings.toLocaleString()}đ</p>
         </div>
       </div>
 
@@ -117,8 +109,8 @@ export default function DeliveryDashboard() {
                 <div className={`w-6 h-6 rounded-full border-4 shadow-md flex items-center justify-center bg-white ${isReached ? 'border-primary' : 'border-gray-200'}`}>
                   {isReached && <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
                 </div>
-                <div className="absolute top-8 left-1/2 -translate-x-1/2 text-center w-24">
-                  <p className="text-xs font-bold text-gray-700">{m.count} Orders</p>
+                <div className={`absolute top-8 ${m.count === 15 ? 'right-0 text-right' : 'left-1/2 -translate-x-1/2 text-center'} w-24`}>
+                  <p className="text-[10px] md:text-xs font-bold text-gray-700">{m.count} Orders</p>
                   <p className={`text-[10px] font-bold ${isReached ? 'text-green-600' : 'text-gray-400'}`}>+{m.reward}</p>
                 </div>
               </div>

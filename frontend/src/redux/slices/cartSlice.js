@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
 // API BASE URL
-const API_URL = 'http://localhost:5000/api/cart';
+const API_URL = 'http://localhost:5001/api/cart';
 
 // Utility to get config
 const getThunkConfig = (thunkAPI) => {
@@ -74,10 +74,13 @@ const cartSlice = createSlice({
                             name: ci.MenuItem.name,
                             price: ci.MenuItem.price,
                             image: ci.MenuItem.image_url,
-                            quantity: ci.quantity
+                            quantity: ci.quantity,
+                            isAvailable: ci.MenuItem.is_available
                         }));
                     state.restaurantId = cartData.restaurant_id;
-                    state.total = state.items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+                    state.total = state.items
+                        .filter(i => i.isAvailable)
+                        .reduce((acc, i) => acc + (i.price * i.quantity), 0);
                 } else {
                     state.items = [];
                     state.restaurantId = null;

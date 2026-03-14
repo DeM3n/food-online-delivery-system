@@ -40,7 +40,7 @@ export default function Register() {
                     onSubmit={async (values, { setSubmitting }) => {
                         try {
                             setError('');
-                            const response = await axios.post('http://localhost:5000/api/auth/register', values);
+                            const response = await axios.post('http://localhost:5001/api/auth/register', values);
                             if (response.data.success) {
                                 setSuccess('Registration successful! Redirecting...');
                                 setTimeout(() => navigate('/login'), 2000);

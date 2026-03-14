@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
-import { notification } from 'antd';
+import { notification, Modal } from 'antd';
 import socket from '../../socket';
 
 export default function DeliveryOrders() {
@@ -14,8 +14,8 @@ export default function DeliveryOrders() {
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
       const [availableRes, activeRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/orders/deliveries/available', config),
-        axios.get(`http://localhost:5000/api/orders/driver/${profile.id}`, config)
+        axios.get('http://localhost:5001/api/orders/deliveries/available', config),
+        axios.get(`http://localhost:5001/api/orders/driver/me`, config)
       ]);
       
       if (availableRes.data.success) {
@@ -63,7 +63,7 @@ export default function DeliveryOrders() {
   const acceptRequest = async (orderId) => {
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const { data } = await axios.put(`http://localhost:5000/api/orders/${orderId}/accept-delivery`, { driver_id: profile.id }, config);
+      const { data } = await axios.put(`http://localhost:5001/api/orders/${orderId}/accept-delivery`, { driver_id: profile.id }, config);
       if (data.success) {
         notification.success({ message: 'Delivery Accepted!' });
         fetchDeliveries();
@@ -74,12 +74,12 @@ export default function DeliveryOrders() {
     }
   };
 
-  const markAsDelivered = async (orderId) => {
+  const updateStatus = async (orderId, newStatus) => {
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const { data } = await axios.put(`http://localhost:5000/api/orders/${orderId}/status`, { status: 'delivered' }, config);
+      const { data } = await axios.put(`http://localhost:5001/api/orders/${orderId}/status`, { status: newStatus }, config);
       if (data.success) {
-        notification.success({ message: 'Order Delivered!' });
+        notification.success({ message: `Order marked as ${newStatus}!` });
         fetchDeliveries();
       }
     } catch (error) {
@@ -103,9 +103,19 @@ export default function DeliveryOrders() {
             <div>
               <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold uppercase mb-2 inline-block">Active Delivery</span>
               <h2 className="text-2xl font-bold text-gray-800">Order #{activeDelivery.id.slice(0, 8)}</h2>
+              <p className="text-sm font-bold text-primary uppercase mt-1">Status: ON THE WAY (PICKED UP)</p>
             </div>
             <button 
-              onClick={() => markAsDelivered(activeDelivery.id)}
+              onClick={() => {
+                Modal.confirm({
+                  title: 'Confirm Delivery',
+                  content: 'Are you sure you have delivered this order?',
+                  okText: 'Yes, Delivered',
+                  cancelText: 'Cancel',
+                  okButtonProps: { className: 'bg-green-500' },
+                  onOk: () => updateStatus(activeDelivery.id, 'delivered')
+                });
+              }}
               className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-md"
             >
               Mark as Delivered
