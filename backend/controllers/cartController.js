@@ -15,8 +15,330 @@ const {
   getGuestCartExpiryDate
 } = require('../utils/cartToken');
 
+const customerCartInclude = [
+  {
+    model: CartItem,
+    include: [
+      {
+        model: MenuItem,
+        paranoid: false,
+        include: [
+          {
+            model: Restaurant,
+            attributes: ['id', 'name', 'is_open', 'rating'],
+            required: false
+          },
+          {
+            model: MenuCategory,
+            attributes: ['id', 'name'],
+            required: false
+          }
+        ]
+      }
+    ]
+  }
+];
+
+const guestCartInclude = [
+  {
+    model: GuestCartItem,
+    include: [
+      {
+        model: MenuItem,
+        paranoid: false,
+        include: [
+          {
+            model: Restaurant,
+            attributes: ['id', 'name', 'is_open', 'rating'],
+            required: false
+          },
+          {
+            model: MenuCategory,
+            attributes: ['id', 'name'],
+            required: false
+          }
+        ]
+      }
+    ]
+  }
+];
 
 const toMoney = (value) => Number(Number(value || 0).toFixed(2));
+
+const mapProductPayload = (menuItem) => {
+  if (!menuItem) return null;
+
+  return {
+    id: menuItem.id,
+    name: menuItem.name,
+    description: menuItem.description,
+    image_url: menuItem.image_url,
+    is_available: menuItem.is_available,
+    restaurant: menuItem.Restaurant
+      ? {
+          id: menuItem.Restaurant.id,
+          name: menuItem.Restaurant.name,
+          is_open: menuItem.Restaurant.is_open,
+          rating: menuItem.Restaurant.rating
+        }
+      : null,
+    category: menuItem.MenuCategory
+      ? {
+          id: menuItem.MenuCategory.id,
+          name: menuItem.MenuCategory.name
+        }
+      : null
+  };
+};
+
+const buildCustomerCartDetailResponse = ({ cart, customerId = null }) => {
+  const items = (cart?.CartItems || []).map((cartItem) => {
+    const unitPrice = toMoney(cartItem.MenuItem?.price || 0);
+    const quantity = Number(cartItem.quantity || 0);
+    const itemSubtotal = toMoney(unitPrice * quantity);
+
+    return {
+      id: cartItem.id,
+      cart_id: cartItem.cart_id,
+      menu_item_id: cartItem.menu_item_id,
+      quantity,
+      unit_price: unitPrice,
+      item_subtotal: itemSubtotal,
+      product: mapProductPayload(cartItem.MenuItem)
+    };
+  });
+
+  const cartSubtotal = toMoney(
+    items.reduce((sum, item) => sum + Number(item.item_subtotal || 0), 0)
+  );
+
+  const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+
+  return {
+    cart_type: 'customer',
+    cart_id: cart?.id || null,
+    customer_id: customerId,
+    restaurant_id: cart?.restaurant_id || null,
+    items,
+    summary: {
+      item_count: items.length,
+      total_quantity: totalQuantity,
+      cart_subtotal: cartSubtotal,
+      cart_total: cartSubtotal
+    }
+  };
+};
+
+const buildGuestCartDetailResponse = ({ guestCartSession, cartToken = null }) => {
+  const items = (guestCartSession?.GuestCartItems || []).map((cartItem) => {
+    const unitPrice = toMoney(cartItem.MenuItem?.price || 0);
+    const quantity = Number(cartItem.quantity || 0);
+    const itemSubtotal = toMoney(unitPrice * quantity);
+
+    return {
+      id: cartItem.id,
+      guest_cart_session_id: cartItem.guest_cart_session_id,
+      menu_item_id: cartItem.menu_item_id,
+      quantity,
+      unit_price: unitPrice,
+      item_subtotal: itemSubtotal,
+      product: mapProductPayload(cartItem.MenuItem)
+    };
+  });
+
+  const cartSubtotal = toMoney(
+    items.reduce((sum, item) => sum + Number(item.item_subtotal || 0), 0)
+  );
+
+  const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+
+  const restaurantId =
+    items.find((item) => item.product?.restaurant?.id)?.product?.restaurant?.id || null;
+
+  return {
+    cart_type: 'guest',
+    guest_cart_session_id: guestCartSession?.id || null,
+    cart_token: cartToken,
+    cart_token_header: 'x-cart-token',
+    expires_at: guestCartSession?.expires_at || null,
+    restaurant_id: restaurantId,
+    items,
+    summary: {
+      item_count: items.length,
+      total_quantity: totalQuantity,
+      cart_subtotal: cartSubtotal,
+      cart_total: cartSubtotal
+    }
+  };
+};
+
+const loadCustomerCartWithDetails = async (cartId) => {
+  return Cart.findOne({
+    where: { id: cartId },
+    include: customerCartInclude
+  });
+};
+
+const loadGuestCartSessionWithDetails = async (guestCartSessionId) => {
+  return GuestCartSession.findOne({
+    where: { id: guestCartSessionId },
+    include: guestCartInclude
+  });
+};
+
+const recalcCustomerCartResponse = async ({ cartId, customerId }) => {
+  const freshCart = await loadCustomerCartWithDetails(cartId);
+
+  return buildCustomerCartDetailResponse({
+    cart: freshCart,
+    customerId
+  });
+};
+
+const recalcGuestCartResponse = async ({ guestCartSessionId, cartToken }) => {
+  const freshSession = await loadGuestCartSessionWithDetails(guestCartSessionId);
+
+  return buildGuestCartDetailResponse({
+    guestCartSession: freshSession,
+    cartToken
+  });
+};
+
+const getGuestCartTokenFromRequest = (req) =>
+  (req.headers['x-cart-token'] || req.query.cart_token || '').toString().trim();
+
+const findGuestCartSessionByToken = async (cartToken) => {
+  if (!cartToken) return null;
+
+  const session = await GuestCartSession.findOne({
+    where: {
+      cart_token_hash: hashGuestCartToken(cartToken)
+    },
+    include: guestCartInclude
+  });
+
+  if (!session) return null;
+
+  if (new Date(session.expires_at) <= new Date()) {
+    await session.destroy();
+    return null;
+  }
+
+  return session;
+};
+
+const getOrCreateGuestCartSession = async (req) => {
+  let cartToken = getGuestCartTokenFromRequest(req);
+  let guestCartSession = await findGuestCartSessionByToken(cartToken);
+  let cartRecreated = false;
+
+  if (!guestCartSession) {
+    cartToken = generateGuestCartToken();
+
+    guestCartSession = await GuestCartSession.create({
+      cart_token_hash: hashGuestCartToken(cartToken),
+      expires_at: getGuestCartExpiryDate()
+    });
+
+    guestCartSession = await loadGuestCartSessionWithDetails(guestCartSession.id);
+    cartRecreated = true;
+  }
+
+  return {
+    guestCartSession,
+    cartToken,
+    cartRecreated
+  };
+};
+
+const requireExistingGuestCartSession = async (req) => {
+  const cartToken = getGuestCartTokenFromRequest(req);
+
+  if (!cartToken) {
+    return {
+      error: {
+        status: 400,
+        body: {
+          success: false,
+          message: 'Guest cart token is required'
+        }
+      }
+    };
+  }
+
+  const guestCartSession = await findGuestCartSessionByToken(cartToken);
+
+  if (!guestCartSession) {
+    return {
+      error: {
+        status: 404,
+        body: {
+          success: false,
+          message: 'Guest cart not found or expired'
+        }
+      }
+    };
+  }
+
+  return { guestCartSession, cartToken };
+};
+
+const validateVisibleAvailableProduct = async (menuItemId) => {
+  const menuItem = await MenuItem.findByPk(menuItemId, {
+    paranoid: false,
+    include: [
+      {
+        model: Restaurant,
+        attributes: ['id', 'name', 'is_open', 'rating'],
+        required: false
+      },
+      {
+        model: MenuCategory,
+        attributes: ['id', 'name'],
+        required: false
+      }
+    ]
+  });
+
+  if (!menuItem) {
+    return { error: { status: 404, message: 'Product not found' } };
+  }
+
+  if (menuItem.deleted_at) {
+    return { error: { status: 404, message: 'Product is hidden' } };
+  }
+
+  if (!menuItem.is_available) {
+    return { error: { status: 400, message: 'Product is unavailable' } };
+  }
+
+  return { menuItem };
+};
+
+const cartItemInclude = [
+  {
+    model: CartItem,
+    include: [
+      {
+        model: MenuItem,
+        include: [
+          {
+            model: Restaurant,
+            attributes: ['id', 'name', 'is_open', 'rating'],
+            required: false
+          },
+          {
+            model: MenuCategory,
+            attributes: ['id', 'name'],
+            required: false
+          }
+        ]
+      }
+    ]
+  }
+];
+
+
 
 const buildCartDetailResponse = ({ cart, customerId = null }) => {
   const items = (cart?.CartItems || []).map((cartItem) => {
@@ -77,123 +399,84 @@ const buildCartDetailResponse = ({ cart, customerId = null }) => {
   };
 };
 
-const getOrCreateGuestCartSession = async (req) => {
-  const incomingCartToken =
-    (req.headers['x-cart-token'] || req.query.cart_token || '').toString().trim();
-
-  let guestCartSession = null;
-  let cartToken = incomingCartToken;
-  let cartRecreated = false;
-
-  if (incomingCartToken) {
-    guestCartSession = await GuestCartSession.findOne({
-      where: {
-        cart_token_hash: hashGuestCartToken(incomingCartToken)
-      },
-      include: [
-        {
-          model: GuestCartItem,
-          include: [
-            {
-              model: MenuItem,
-              paranoid: false
-            }
-          ]
-        }
-      ]
-    });
-
-    if (guestCartSession && new Date(guestCartSession.expires_at) <= new Date()) {
-      await guestCartSession.destroy();
-      guestCartSession = null;
-      cartRecreated = true;
-    }
-  }
-
-  if (!guestCartSession) {
-    cartToken = generateGuestCartToken();
-
-    guestCartSession = await GuestCartSession.create({
-      cart_token_hash: hashGuestCartToken(cartToken),
-      expires_at: getGuestCartExpiryDate()
-    });
-  }
-
-  return {
-    guestCartSession,
-    cartToken,
-    cartRecreated
-  };
+const loadCartWithDetails = async (cartId) => {
+  return Cart.findOne({
+    where: { id: cartId },
+    include: cartItemInclude
+  });
 };
+
+const recalcCartResponse = async ({ cartId, customerId }) => {
+  const freshCart = await loadCartWithDetails(cartId);
+  return buildCartDetailResponse({
+    cart: freshCart,
+    customerId
+  });
+};
+
+
+
 
 // =========================
 // GET ACTIVE CART
 // =========================
 // @desc    Get cart details
 // @route   GET /api/cart
-// @access  Private
+// @access  Public
 exports.getCart = async (req, res) => {
   try {
-    const customer = await Customer.findOne({
-      where: { user_id: req.user.id }
-    });
-
-    if (!customer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Customer not found'
+    if (req.user?.id) {
+      const customer = await Customer.findOne({
+        where: { user_id: req.user.id }
       });
-    }
 
-    const cart = await Cart.findOne({
-      where: { customer_id: customer.id },
-      include: [
-        {
-          model: CartItem,
-          include: [
-            {
-              model: MenuItem,
-              include: [
-                {
-                  model: Restaurant,
-                  attributes: ['id', 'name', 'is_open', 'rating'],
-                  required: false
-                },
-                {
-                  model: MenuCategory,
-                  attributes: ['id', 'name'],
-                  required: false
-                }
-              ]
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          message: 'Customer not found'
+        });
+      }
+
+      const cart = await Cart.findOne({
+        where: { customer_id: customer.id },
+        include: customerCartInclude
+      });
+
+      if (!cart) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            cart_type: 'customer',
+            cart_id: null,
+            customer_id: customer.id,
+            restaurant_id: null,
+            items: [],
+            summary: {
+              item_count: 0,
+              total_quantity: 0,
+              cart_subtotal: 0,
+              cart_total: 0
             }
-          ]
-        }
-      ]
-    });
+          }
+        });
+      }
 
-    if (!cart) {
       return res.status(200).json({
         success: true,
-        data: {
-          cart_id: null,
-          customer_id: customer.id,
-          restaurant_id: null,
-          items: [],
-          summary: {
-            item_count: 0,
-            total_quantity: 0,
-            cart_subtotal: 0,
-            cart_total: 0
-          }
-        }
+        data: buildCustomerCartDetailResponse({
+          cart,
+          customerId: customer.id
+        })
       });
     }
+
+    const { guestCartSession, cartToken } = await getOrCreateGuestCartSession(req);
 
     return res.status(200).json({
       success: true,
-      data: buildCartDetailResponse({
-        cart,
-        customerId: customer.id
+      data: buildGuestCartDetailResponse({
+        guestCartSession,
+        cartToken
       })
     });
   } catch (error) {
@@ -204,16 +487,13 @@ exports.getCart = async (req, res) => {
     });
   }
 };
-// @desc    Add item to cart (guest or customer)
+// @desc    Add item to cart
 // @route   POST /api/cart/items
 // @access  Public
 exports.addItemToCart = async (req, res) => {
   try {
     const { menu_item_id, quantity, restaurant_id, options } = req.body;
 
-    // =========================
-    // VALIDATE INPUT
-    // =========================
     if (!menu_item_id) {
       return res.status(400).json({
         success: false,
@@ -253,49 +533,16 @@ exports.addItemToCart = async (req, res) => {
       });
     }
 
-    // =========================
-    // VALIDATE PRODUCT EXISTS + VISIBLE
-    // =========================
-    const menuItem = await MenuItem.findByPk(menu_item_id, {
-      paranoid: false,
-      include: [
-        {
-          model: Restaurant,
-          attributes: ['id', 'name', 'is_open', 'rating'],
-          required: false
-        },
-        {
-          model: MenuCategory,
-          attributes: ['id', 'name'],
-          required: false
-        }
-      ]
-    });
-
-    if (!menuItem) {
-      return res.status(404).json({
+    const productCheck = await validateVisibleAvailableProduct(menu_item_id);
+    if (productCheck.error) {
+      return res.status(productCheck.error.status).json({
         success: false,
-        message: 'Product not found'
+        message: productCheck.error.message
       });
     }
 
-    // hidden = soft deleted
-    if (menuItem.deleted_at) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product is hidden'
-      });
-    }
+    const menuItem = productCheck.menuItem;
 
-    // unavailable
-    if (!menuItem.is_available) {
-      return res.status(400).json({
-        success: false,
-        message: 'Product is unavailable'
-      });
-    }
-
-    // restaurant check
     if (restaurant_id && restaurant_id !== menuItem.restaurant_id) {
       return res.status(400).json({
         success: false,
@@ -305,9 +552,7 @@ exports.addItemToCart = async (req, res) => {
 
     const targetRestaurantId = menuItem.restaurant_id;
 
-    // =========================
-    // CUSTOMER CART
-    // =========================
+    // CUSTOMER
     if (req.user?.id) {
       const customer = await Customer.findOne({
         where: { user_id: req.user.id }
@@ -331,7 +576,6 @@ exports.addItemToCart = async (req, res) => {
         });
       }
 
-      // one-restaurant-per-cart rule
       if (cart.restaurant_id && cart.restaurant_id !== targetRestaurantId) {
         await CartItem.destroy({
           where: { cart_id: cart.id }
@@ -367,51 +611,36 @@ exports.addItemToCart = async (req, res) => {
         });
       }
 
+      const cartDetails = await recalcCustomerCartResponse({
+        cartId: cart.id,
+        customerId: customer.id
+      });
+
+      const updatedItem = cartDetails.items.find((item) => item.id === cartItem.id) || null;
+
       return res.status(200).json({
         success: true,
         message: 'Item added to cart',
         data: {
-          cart_type: 'customer',
-          cart_id: cart.id,
-          customer_id: customer.id,
-          restaurant_id: cart.restaurant_id,
           action,
-          item: {
-            id: cartItem.id,
-            menu_item_id: cartItem.menu_item_id,
-            quantity: cartItem.quantity
-          },
-          product: {
-            id: menuItem.id,
-            name: menuItem.name,
-            price: menuItem.price,
-            image_url: menuItem.image_url,
-            restaurant_name: menuItem.Restaurant?.name || null,
-            category_name: menuItem.MenuCategory?.name || null
-          }
+          updated_item: updatedItem,
+          cart: cartDetails
         }
       });
     }
 
-    // =========================
-    // GUEST CART
-    // =========================
+    // GUEST
     const {
       guestCartSession,
-      cartToken,
-      cartRecreated
+      cartToken
     } = await getOrCreateGuestCartSession(req);
 
-    const currentGuestItems = guestCartSession.GuestCartItems || [];
     const currentRestaurantId =
-      currentGuestItems.find((item) => item.MenuItem?.restaurant_id)?.MenuItem?.restaurant_id || null;
+      (guestCartSession.GuestCartItems || []).find((item) => item.MenuItem?.restaurant_id)?.MenuItem?.restaurant_id || null;
 
-    // one-restaurant-per-cart rule for guest
     if (currentRestaurantId && currentRestaurantId !== targetRestaurantId) {
       await GuestCartItem.destroy({
-        where: {
-          guest_cart_session_id: guestCartSession.id
-        }
+        where: { guest_cart_session_id: guestCartSession.id }
       });
     }
 
@@ -436,33 +665,20 @@ exports.addItemToCart = async (req, res) => {
       });
     }
 
+    const cartDetails = await recalcGuestCartResponse({
+      guestCartSessionId: guestCartSession.id,
+      cartToken
+    });
+
+    const updatedItem = cartDetails.items.find((item) => item.id === guestCartItem.id) || null;
+
     return res.status(200).json({
       success: true,
       message: 'Item added to cart',
       data: {
-        cart_type: 'guest',
-        guest_cart_session_id: guestCartSession.id,
-        cart_token: cartToken,
-        cart_token_header: 'x-cart-token',
-        expires_at: guestCartSession.expires_at,
-        restaurant_id: targetRestaurantId,
         action,
-        item: {
-          id: guestCartItem.id,
-          menu_item_id: guestCartItem.menu_item_id,
-          quantity: guestCartItem.quantity
-        },
-        product: {
-          id: menuItem.id,
-          name: menuItem.name,
-          price: menuItem.price,
-          image_url: menuItem.image_url,
-          restaurant_name: menuItem.Restaurant?.name || null,
-          category_name: menuItem.MenuCategory?.name || null
-        }
-      },
-      meta: {
-        cart_recreated: cartRecreated
+        updated_item: updatedItem,
+        cart: cartDetails
       }
     });
   } catch (error) {
@@ -476,7 +692,7 @@ exports.addItemToCart = async (req, res) => {
 
 // @desc    Update cart item quantity
 // @route   PATCH /api/cart/items/:itemId
-// @access  Private
+// @access  Public
 exports.updateItemQuantity = async (req, res) => {
   try {
     const { quantity } = req.body;
@@ -512,111 +728,126 @@ exports.updateItemQuantity = async (req, res) => {
       });
     }
 
-    const customer = await Customer.findOne({
-      where: { user_id: req.user.id }
-    });
+    // CUSTOMER
+    if (req.user?.id) {
+      const customer = await Customer.findOne({
+        where: { user_id: req.user.id }
+      });
 
-    if (!customer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Customer not found'
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          message: 'Customer not found'
+        });
+      }
+
+      const cart = await Cart.findOne({
+        where: { customer_id: customer.id }
+      });
+
+      if (!cart) {
+        return res.status(404).json({
+          success: false,
+          message: 'Cart not found'
+        });
+      }
+
+      const cartItem = await CartItem.findOne({
+        where: {
+          id: itemId,
+          cart_id: cart.id
+        }
+      });
+
+      if (!cartItem) {
+        return res.status(404).json({
+          success: false,
+          message: 'Cart item not found'
+        });
+      }
+
+      const productCheck = await validateVisibleAvailableProduct(cartItem.menu_item_id);
+      if (productCheck.error) {
+        return res.status(productCheck.error.status).json({
+          success: false,
+          message: productCheck.error.message
+        });
+      }
+
+      if (parsedQuantity === 0) {
+        await cartItem.destroy();
+
+        const cartDetails = await recalcCustomerCartResponse({
+          cartId: cart.id,
+          customerId: customer.id
+        });
+
+        return res.status(200).json({
+          success: true,
+          message: 'Cart item removed',
+          data: {
+            updated_item: null,
+            cart: cartDetails
+          }
+        });
+      }
+
+      cartItem.quantity = parsedQuantity;
+      await cartItem.save();
+
+      const cartDetails = await recalcCustomerCartResponse({
+        cartId: cart.id,
+        customerId: customer.id
+      });
+
+      const updatedItem = cartDetails.items.find((item) => item.id === cartItem.id) || null;
+
+      return res.status(200).json({
+        success: true,
+        message: 'Quantity updated successfully',
+        data: {
+          updated_item: updatedItem,
+          cart: cartDetails
+        }
       });
     }
 
-    const cart = await Cart.findOne({
-      where: { customer_id: customer.id }
-    });
-
-    if (!cart) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cart not found'
-      });
+    // GUEST
+    const guestLookup = await requireExistingGuestCartSession(req);
+    if (guestLookup.error) {
+      return res.status(guestLookup.error.status).json(guestLookup.error.body);
     }
 
-    const cartItem = await CartItem.findOne({
+    const { guestCartSession, cartToken } = guestLookup;
+
+    const guestCartItem = await GuestCartItem.findOne({
       where: {
         id: itemId,
-        cart_id: cart.id
-      },
-      include: [
-        {
-          model: MenuItem,
-          paranoid: false,
-          include: [
-            {
-              model: Restaurant,
-              attributes: ['id', 'name', 'is_open', 'rating'],
-              required: false
-            },
-            {
-              model: MenuCategory,
-              attributes: ['id', 'name'],
-              required: false
-            }
-          ]
-        }
-      ]
+        guest_cart_session_id: guestCartSession.id
+      }
     });
 
-    if (!cartItem) {
+    if (!guestCartItem) {
       return res.status(404).json({
         success: false,
         message: 'Cart item not found'
       });
     }
 
-    const menuItem = cartItem.MenuItem;
-
-    if (!menuItem) {
-      return res.status(404).json({
+    const productCheck = await validateVisibleAvailableProduct(guestCartItem.menu_item_id);
+    if (productCheck.error) {
+      return res.status(productCheck.error.status).json({
         success: false,
-        message: 'Product not found'
+        message: productCheck.error.message
       });
     }
 
-    if (menuItem.deleted_at) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product is hidden'
-      });
-    }
-
-    if (!menuItem.is_available) {
-      return res.status(400).json({
-        success: false,
-        message: 'Product is unavailable'
-      });
-    }
-
-    // quantity = 0 => remove item
     if (parsedQuantity === 0) {
-      await cartItem.destroy();
+      await guestCartItem.destroy();
 
-      const updatedCart = await Cart.findOne({
-        where: { id: cart.id },
-        include: [
-          {
-            model: CartItem,
-            include: [
-              {
-                model: MenuItem,
-                include: [
-                  {
-                    model: Restaurant,
-                    attributes: ['id', 'name', 'is_open', 'rating'],
-                    required: false
-                  },
-                  {
-                    model: MenuCategory,
-                    attributes: ['id', 'name'],
-                    required: false
-                  }
-                ]
-              }
-            ]
-          }
-        ]
+      const cartDetails = await recalcGuestCartResponse({
+        guestCartSessionId: guestCartSession.id,
+        cartToken
       });
 
       return res.status(200).json({
@@ -624,50 +855,20 @@ exports.updateItemQuantity = async (req, res) => {
         message: 'Cart item removed',
         data: {
           updated_item: null,
-          cart: buildCartDetailResponse({
-            cart: updatedCart,
-            customerId: customer.id
-          })
+          cart: cartDetails
         }
       });
     }
 
-    // PATCH = set trực tiếp số lượng mới
-    cartItem.quantity = parsedQuantity;
-    await cartItem.save();
+    guestCartItem.quantity = parsedQuantity;
+    await guestCartItem.save();
 
-    const refreshedCart = await Cart.findOne({
-      where: { id: cart.id },
-      include: [
-        {
-          model: CartItem,
-          include: [
-            {
-              model: MenuItem,
-              include: [
-                {
-                  model: Restaurant,
-                  attributes: ['id', 'name', 'is_open', 'rating'],
-                  required: false
-                },
-                {
-                  model: MenuCategory,
-                  attributes: ['id', 'name'],
-                  required: false
-                }
-              ]
-            }
-          ]
-        }
-      ]
+    const cartDetails = await recalcGuestCartResponse({
+      guestCartSessionId: guestCartSession.id,
+      cartToken
     });
 
-    const cartDetails = buildCartDetailResponse({
-      cart: refreshedCart,
-      customerId: customer.id
-    });
-
-    const updatedItem = cartDetails.items.find((item) => item.id === cartItem.id) || null;
+    const updatedItem = cartDetails.items.find((item) => item.id === guestCartItem.id) || null;
 
     return res.status(200).json({
       success: true,
@@ -691,87 +892,102 @@ exports.updateItemQuantity = async (req, res) => {
 
 // Add / replace these methods in backend/controllers/cartController.js
 
-// @desc    Remove cart item and return updated cart details
+// @desc    Remove cart item
 // @route   DELETE /api/cart/items/:itemId
-// @access  Private
+// @access  Public
 exports.removeItem = async (req, res) => {
   try {
     const itemId = req.params.itemId;
 
-    const customer = await Customer.findOne({
-      where: { user_id: req.user.id }
-    });
+    // CUSTOMER
+    if (req.user?.id) {
+      const customer = await Customer.findOne({
+        where: { user_id: req.user.id }
+      });
 
-    if (!customer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Customer not found'
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          message: 'Customer not found'
+        });
+      }
+
+      const cart = await Cart.findOne({
+        where: { customer_id: customer.id }
+      });
+
+      if (!cart) {
+        return res.status(404).json({
+          success: false,
+          message: 'Cart not found'
+        });
+      }
+
+      const cartItem = await CartItem.findOne({
+        where: {
+          id: itemId,
+          cart_id: cart.id
+        }
+      });
+
+      if (!cartItem) {
+        return res.status(404).json({
+          success: false,
+          message: 'Cart item not found'
+        });
+      }
+
+      await cartItem.destroy();
+
+      const cartDetails = await recalcCustomerCartResponse({
+        cartId: cart.id,
+        customerId: customer.id
+      });
+
+      if ((cartDetails.items || []).length === 0 && cart.restaurant_id) {
+        cart.restaurant_id = null;
+        await cart.save();
+        cartDetails.restaurant_id = null;
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Item removed successfully',
+        data: {
+          removed_item_id: itemId,
+          cart: cartDetails
+        }
       });
     }
 
-    const cart = await Cart.findOne({
-      where: { customer_id: customer.id }
-    });
-
-    if (!cart) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cart not found'
-      });
+    // GUEST
+    const guestLookup = await requireExistingGuestCartSession(req);
+    if (guestLookup.error) {
+      return res.status(guestLookup.error.status).json(guestLookup.error.body);
     }
 
-    const cartItem = await CartItem.findOne({
+    const { guestCartSession, cartToken } = guestLookup;
+
+    const guestCartItem = await GuestCartItem.findOne({
       where: {
         id: itemId,
-        cart_id: cart.id
+        guest_cart_session_id: guestCartSession.id
       }
     });
 
-    if (!cartItem) {
+    if (!guestCartItem) {
       return res.status(404).json({
         success: false,
         message: 'Cart item not found'
       });
     }
 
-    await cartItem.destroy();
+    await guestCartItem.destroy();
 
-    const refreshedCart = await Cart.findOne({
-      where: { id: cart.id },
-      include: [
-        {
-          model: CartItem,
-          include: [
-            {
-              model: MenuItem,
-              include: [
-                {
-                  model: Restaurant,
-                  attributes: ['id', 'name', 'is_open', 'rating'],
-                  required: false
-                },
-                {
-                  model: MenuCategory,
-                  attributes: ['id', 'name'],
-                  required: false
-                }
-              ]
-            }
-          ]
-        }
-      ]
+    const cartDetails = await recalcGuestCartResponse({
+      guestCartSessionId: guestCartSession.id,
+      cartToken
     });
-
-    const cartDetails = buildCartDetailResponse({
-      cart: refreshedCart,
-      customerId: customer.id
-    });
-
-    if ((cartDetails.items || []).length === 0 && cart.restaurant_id) {
-      cart.restaurant_id = null;
-      await cart.save();
-      cartDetails.restaurant_id = null;
-    }
 
     return res.status(200).json({
       success: true,
@@ -790,34 +1006,84 @@ exports.removeItem = async (req, res) => {
   }
 };
 
-// @desc    Clear cart and return empty cart details
+// @desc    Clear cart
 // @route   DELETE /api/cart/items
-// @access  Private
+// @access  Public
 exports.clearCart = async (req, res) => {
   try {
-    const customer = await Customer.findOne({
-      where: { user_id: req.user.id }
-    });
+    // CUSTOMER
+    if (req.user?.id) {
+      const customer = await Customer.findOne({
+        where: { user_id: req.user.id }
+      });
 
-    if (!customer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Customer not found'
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          message: 'Customer not found'
+        });
+      }
+
+      const cart = await Cart.findOne({
+        where: { customer_id: customer.id }
+      });
+
+      if (!cart) {
+        return res.status(200).json({
+          success: true,
+          message: 'Cart already empty',
+          data: {
+            cart: {
+              cart_type: 'customer',
+              cart_id: null,
+              customer_id: customer.id,
+              restaurant_id: null,
+              items: [],
+              summary: {
+                item_count: 0,
+                total_quantity: 0,
+                cart_subtotal: 0,
+                cart_total: 0
+              }
+            }
+          }
+        });
+      }
+
+      await CartItem.destroy({
+        where: { cart_id: cart.id }
+      });
+
+      cart.restaurant_id = null;
+      await cart.save();
+
+      const cartDetails = await recalcCustomerCartResponse({
+        cartId: cart.id,
+        customerId: customer.id
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Cart cleared successfully',
+        data: {
+          cart: cartDetails
+        }
       });
     }
 
-    const cart = await Cart.findOne({
-      where: { customer_id: customer.id }
-    });
-
-    if (!cart) {
+    // GUEST
+    const guestLookup = await requireExistingGuestCartSession(req);
+    if (guestLookup.error) {
       return res.status(200).json({
         success: true,
         message: 'Cart already empty',
         data: {
           cart: {
-            cart_id: null,
-            customer_id: customer.id,
+            cart_type: 'guest',
+            guest_cart_session_id: null,
+            cart_token: getGuestCartTokenFromRequest(req) || null,
+            cart_token_header: 'x-cart-token',
+            expires_at: null,
             restaurant_id: null,
             items: [],
             summary: {
@@ -831,29 +1097,22 @@ exports.clearCart = async (req, res) => {
       });
     }
 
-    await CartItem.destroy({
-      where: { cart_id: cart.id }
+    const { guestCartSession, cartToken } = guestLookup;
+
+    await GuestCartItem.destroy({
+      where: { guest_cart_session_id: guestCartSession.id }
     });
 
-    cart.restaurant_id = null;
-    await cart.save();
+    const cartDetails = await recalcGuestCartResponse({
+      guestCartSessionId: guestCartSession.id,
+      cartToken
+    });
 
     return res.status(200).json({
       success: true,
       message: 'Cart cleared successfully',
       data: {
-        cart: {
-          cart_id: cart.id,
-          customer_id: customer.id,
-          restaurant_id: null,
-          items: [],
-          summary: {
-            item_count: 0,
-            total_quantity: 0,
-            cart_subtotal: 0,
-            cart_total: 0
-          }
-        }
+        cart: cartDetails
       }
     });
   } catch (error) {
