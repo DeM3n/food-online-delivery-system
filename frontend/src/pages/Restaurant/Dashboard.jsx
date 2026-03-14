@@ -5,16 +5,17 @@ import socket from '../../socket';
 import { notification } from 'antd';
 
 export default function RestaurantDashboard() {
-  const { profile, user } = useSelector(state => state.auth);
+  const { profile, user, token } = useSelector(state => state.auth);
   const [orders, setOrders] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
     try {
+      const config = { headers: { Authorization: `Bearer ${token}` } };
       const [ordersRes, menuRes] = await Promise.all([
-        axios.get(`http://localhost:5001/api/orders/restaurant/me`),
-        axios.get(`http://localhost:5001/api/menu/full/${profile.id}`)
+        axios.get(`http://localhost:5001/api/orders/restaurant/me`, config),
+        axios.get(`http://localhost:5001/api/menu/full/${profile.id}`, config)
       ]);
 
       if (ordersRes.data.success) {

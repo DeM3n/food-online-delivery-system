@@ -17,17 +17,22 @@ const io = new Server(server, {
     }
 });
 
+// Enable CORS - Move to top and configure explicitly
+app.use(cors({
+    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    credentials: true
+}));
+
+// Body parser
+app.use(express.json());
+
 // Make io accessible in requests
 app.use((req, res, next) => {
     req.io = io;
     next();
 });
-
-// Body parser
-app.use(express.json());
-
-// Enable CORS
-app.use(cors());
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -77,4 +82,4 @@ sequelize.sync({ force: false }).then(() => {
 }).catch(err => {
     console.error('Failed to sync database:', err);
 });
- 
+
