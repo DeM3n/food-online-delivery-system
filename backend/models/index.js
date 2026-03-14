@@ -1,5 +1,6 @@
 const sequelize = require('../config/db');
 
+
 // Import all models
 const User = require('./User');
 const Restaurant = require('./Restaurant');
@@ -8,6 +9,7 @@ const DeliveryPartner = require('./DeliveryPartner');
 const Admin = require('./Admin');
 const CustomerSupport = require('./CustomerSupport');
 const AuthOtp = require('./AuthOtp');
+const Content = require('./Content');
 
 const Address = require('./Address');
 const MenuCategory = require('./MenuCategory');
@@ -143,4 +145,5 @@ module.exports = {
   Notification,
   AuthSession,
   AuthOtp,
+  Content,
 };
