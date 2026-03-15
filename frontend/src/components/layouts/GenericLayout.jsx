@@ -4,6 +4,15 @@ import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../redux/slices/authSlice';
 import { resetCartState } from '../../redux/slices/cartSlice';
+import { 
+  AppstoreOutlined, 
+  ShoppingOutlined, 
+  UserOutlined, 
+  TeamOutlined, 
+  UnorderedListOutlined,
+  LogoutOutlined,
+  ArrowRightOutlined
+} from '@ant-design/icons';
 
 export default function GenericLayout({ roleTitle, rolePath }) {
   const dispatch = useDispatch();
@@ -29,11 +38,11 @@ export default function GenericLayout({ roleTitle, rolePath }) {
           </div>
 
           <nav className="space-y-2">
-            <NavItem to={`${rolePath}`} icon="📊" label="Dashboard" />
-            <NavItem to={`${rolePath}/orders`} icon="📦" label="Orders" />
-            {roleTitle === 'Restaurant' && <NavItem to={`${rolePath}/menu`} icon="🍱" label="Menu Catalog" />}
-            {roleTitle === 'Admin' && <NavItem to={`${rolePath}/users`} icon="👥" label="User Management" />}
-            <NavItem to={`${rolePath}/profile`} icon="👤" label="Profile" />
+            <NavItem to={`${rolePath}`} icon={<AppstoreOutlined />} label="Dashboard" />
+            <NavItem to={`${rolePath}/orders`} icon={<ShoppingOutlined />} label="Orders" />
+            {roleTitle === 'Restaurant' && <NavItem to={`${rolePath}/menu`} icon={<UnorderedListOutlined />} label="Menu Catalog" />}
+            {rolePath.includes('admin') && <NavItem to={`${rolePath}/users`} icon={<TeamOutlined />} label="User Management" />}
+            <NavItem to={`${rolePath}/profile`} icon={<UserOutlined />} label="Profile" />
           </nav>
         </div>
       </aside>
@@ -62,7 +71,7 @@ export default function GenericLayout({ roleTitle, rolePath }) {
               onClick={handleLogout}
               className="flex items-center gap-2 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-red-200 focus:outline-none focus:ring-4 focus:ring-red-100 group"
             >
-              <span className="text-lg group-hover:-translate-x-1 transition-transform">🚪</span>
+              <LogoutOutlined className="group-hover:-translate-x-1 transition-transform" />
               <span>Logout</span>
             </button>
           </div>
@@ -82,9 +91,9 @@ function NavItem({ to, icon, label }) {
       to={to}
       className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all duration-200 group font-medium"
     >
-      <span className="text-xl opacity-70 group-hover:opacity-100 transition-opacity">{icon}</span>
-      <span>{label}</span>
-      <span className="ml-auto opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all text-xs">➡️</span>
+      <span className="text-lg opacity-70 group-hover:opacity-100 transition-opacity flex items-center">{icon}</span>
+      <span className="text-sm">{label}</span>
+      <ArrowRightOutlined className="ml-auto opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all text-[10px]" />
     </Link>
   );
 }

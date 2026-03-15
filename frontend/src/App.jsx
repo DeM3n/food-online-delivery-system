@@ -26,6 +26,8 @@ import MenuManagement from './pages/Restaurant/MenuManagement';
 import DeliveryDashboard from './pages/Delivery/Dashboard';
 import DeliveryOrders from './pages/Delivery/Orders';
 import AdminDashboard from './pages/Admin/Dashboard';
+import AdminUsers from './pages/Admin/AdminUsers';
+import AdminOrders from './pages/Admin/AdminOrders';
 
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
@@ -92,25 +94,33 @@ function App() {
     if (token && user && user.role === 'customer') {
       dispatch(fetchCart());
     }
-    
+  }, [token, user, dispatch]);
+
+  // Socket Connection Management
+  useEffect(() => {
     socket.connect();
-    socket.on('connect', () => {
+
+    const onConnect = () => {
       console.log('Connected to real-time server');
       if (user && user.id) {
         socket.emit('join', user.id);
       }
-    });
+    };
 
-    // If user changes/authenticates, ensure they join their room
-    if (user && user.id) {
-      socket.emit('join', user.id);
-    }
+    socket.on('connect', onConnect);
 
     return () => {
-      socket.off('connect');
+      socket.off('connect', onConnect);
       socket.disconnect();
     };
-  }, [token, user, dispatch]);
+  }, []); // Only connect/disconnect on mount/unmount
+
+  // Handle User Room Joining when auth state changes
+  useEffect(() => {
+    if (socket.connected && user && user.id) {
+      socket.emit('join', user.id);
+    }
+  }, [user]);
 
   return (
     <div className="font-sans bg-background min-h-screen text-textMain">
@@ -148,8 +158,8 @@ function App() {
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
-          <Route path="orders" element={<div>System Orders</div>} />
-          <Route path="users" element={<div>User Management</div>} />
+          <Route path="orders" element={<AdminOrders />} />
+          <Route path="users" element={<AdminUsers />} />
           <Route path="profile" element={<Profile />} />
         </Route>
 
