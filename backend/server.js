@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
 const { sequelize } = require('./models');
+const { VNPay, ignoreLogger, ProductCode, VnpLocale, dateFormat } = require("vnpay");
 
 // Load env vars
 dotenv.config();
@@ -28,6 +29,8 @@ app.use(cors({
 // Body parser
 app.use(express.json());
 
+
+
 // Make io accessible in requests
 app.use((req, res, next) => {
     req.io = io;
@@ -41,6 +44,7 @@ const menuRoutes = require('./routes/menuRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const cartRoutes = require('./routes/cartRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -49,6 +53,7 @@ app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Socket.io Connection Logic
 io.on('connection', (socket) => {

@@ -34,13 +34,12 @@ export default function CheckoutPage() {
         try {
             setLoading(true);
             const orderData = {
-                restaurant_id: restaurantId,
-                items,
-                delivery_fee: deliveryFee,
-                address_details: address,
-                notes,
+                restaurant_id: "cd1e81cf-8f4c-4c8a-8e97-afda83106a8a",
+                delivery_address_id: "1e30bb6d-df57-4e48-a287-d03393565862",
+                notes: "Test thanh toán VNPay",
                 payment_method: paymentMethod,
-                force_proceed: force
+                items,
+                delivery_fee: deliveryFee
             };
 
             const config = {
@@ -55,8 +54,13 @@ export default function CheckoutPage() {
                     description: 'Your order has been received!',
                     placement: 'topRight'
                 });
+                if(paymentMethod === "vnpay"){
+                    window.location.assign(response.data.paymentUrl);
+                } else if (paymentMethod === "cod"){
+                    navigate("/customer/tracking");
+                }
                 dispatch(clearCartAsync());
-                navigate('/customer'); 
+                
             }
         } catch (error) {
             console.error('Checkout error:', error);
@@ -181,15 +185,15 @@ export default function CheckoutPage() {
                             </div>
 
                             <div 
-                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${paymentMethod === 'online' ? 'border-primary bg-orange-50' : 'border-gray-100 hover:border-orange-200 opacity-50'}`}
-                                onClick={() => setPaymentMethod('online')}
+                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${paymentMethod === 'vnpay' ? 'border-primary bg-orange-50' : 'border-gray-100 hover:border-orange-200 opacity-50'}`}
+                                onClick={() => setPaymentMethod('vnpay')}
                             >
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${paymentMethod === 'online' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${paymentMethod === 'vnpay' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500'}`}>
                                     <CreditCardOutlined className="text-xl" />
                                 </div>
                                 <div>
                                     <p className="font-bold text-gray-800">Online Payment</p>
-                                    <p className="text-xs text-gray-500">Coming Soon!</p>
+                                    <p className="text-xs text-gray-500">Through VNPay!</p>
                                 </div>
                             </div>
                         </div>
