@@ -63,21 +63,47 @@ exports.getMonthlyFavorite = async (req, res) => {
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Private
+// exports.createOrder = async (req, res) => {
+//     try {
+//         const order = await orderService.createOrder(req.user.id, req.body, req.io);
+//         res.status(201).json({ success: true, data: order });
+//     } catch (error) {
+//         console.error(error);
+//         const statusCode = error.message.includes('not found') ? 404 : 
+//                            (error.type === 'AVAILABILITY_CONFLICT') ? 400 : 500;
+//         res.status(statusCode).json({ 
+//             success: false, 
+//             message: error.message,
+//             type: error.type,
+//             unavailableItems: error.unavailableItems
+//         });
+//     }
+// };
 exports.createOrder = async (req, res) => {
-    try {
-        const order = await orderService.createOrder(req.user.id, req.body, req.io);
-        res.status(201).json({ success: true, data: order });
-    } catch (error) {
-        console.error(error);
-        const statusCode = error.message.includes('not found') ? 404 : 
-                           (error.type === 'AVAILABILITY_CONFLICT') ? 400 : 500;
-        res.status(statusCode).json({ 
-            success: false, 
-            message: error.message,
-            type: error.type,
-            unavailableItems: error.unavailableItems
-        });
-    }
+  try {
+    const result = await orderService.createOrder(req.user.id, req.body, req.io, req);
+
+    res.status(201).json({
+      success: true,
+      data: result.order,
+      requiresPayment: result.requiresPayment,
+      paymentUrl: result.paymentUrl,
+    });
+  } catch (error) {
+    console.error(error);
+    const statusCode = error.message.includes('not found')
+      ? 404
+      : error.type === 'AVAILABILITY_CONFLICT'
+      ? 400
+      : 500;
+
+    res.status(statusCode).json({
+      success: false,
+      message: error.message,
+      type: error.type,
+      unavailableItems: error.unavailableItems,
+    });
+  }
 };
 
 // @desc    Get available deliveries for drivers
