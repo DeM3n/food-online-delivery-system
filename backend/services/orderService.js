@@ -2,6 +2,7 @@ const { Order, Customer, Restaurant, DeliveryPartner, User, OrderItem, Address, 
 const { Op } = require('sequelize');
 const paymentService = require('./paymentService');
 const { Payment } = require('../models');
+const { sendDeliveredOrderEmail } = require('./mailService');   
 
 class OrderService {
     async getRestaurantOrders(userId, statusFilter) {
@@ -321,7 +322,13 @@ class OrderService {
 
     async updateStatus(orderId, status, user, io) {
         const order = await Order.findByPk(orderId, {
-            include: [{ model: Customer }, { model: Restaurant }]
+            include: [
+                {
+                    model: Customer,
+                    include: [{ model: User, attributes: ['email', 'full_name'] }]
+                },
+                { model: Restaurant, attributes: ['name', 'user_id'] }
+            ]
         });
 
         if (!order) throw new Error('Order not found');
@@ -349,18 +356,47 @@ class OrderService {
             }
         }
 
+        const oldStatus = order.status;
+
         order.status = status;
         await order.save();
 
         const statusData = { orderId: order.id, status: order.status };
-        if (order.Customer && io) io.to(order.Customer.user_id).emit('ORDER_STATUS_UPDATED', statusData);
-        if (order.Restaurant && io) io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', statusData);
+
+        if (order.Customer && io) {
+            io.to(order.Customer.user_id).emit('ORDER_STATUS_UPDATED', statusData);
+        }
+
+        if (order.Restaurant && io) {
+            io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', statusData);
+        }
 
         if (status === 'preparing' && io) {
             io.to('available_deliveries').emit('AVAILABLE_DELIVERY', {
                 orderId: order.id,
                 restaurantName: order.Restaurant?.name || 'Restaurant'
             });
+        }
+
+        // Gửi mail khi vừa chuyển sang delivered
+        if (oldStatus !== 'delivered' && status === 'delivered') {
+            try {
+                const customerEmail = order.Customer?.User?.email;
+                const customerName = order.Customer?.User?.full_name;
+                const restaurantName = order.Restaurant?.name;
+
+                if (customerEmail) {
+                    await sendDeliveredOrderEmail({
+                        to: customerEmail,
+                        customerName,
+                        orderId: order.id,
+                        restaurantName,
+                    });
+                }
+            } catch (mailError) {
+                console.error('Send delivered email failed:', mailError);
+                // Không throw để tránh update status thành công nhưng fail vì lỗi mail
+            }
         }
 
         return order;
