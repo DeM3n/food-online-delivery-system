@@ -5,8 +5,9 @@ const orderService = require('../services/orderService');
 // @access  Private
 exports.getRestaurantOrders = async (req, res) => {
     try {
-        const orders = await orderService.getRestaurantOrders(req.user.id);
-        res.json({ success: true, data: orders });
+        const { status } = req.query;
+        const result = await orderService.getRestaurantOrders(req.user.id, status);
+        res.json({ success: true, data: result.orders, counts: result.counts });
     } catch (error) {
         console.error(error);
         const statusCode = error.message.includes('not found') ? 404 : 500;
@@ -35,8 +36,9 @@ exports.updateOrderStatus = async (req, res) => {
 // @access  Private
 exports.getUserOrders = async (req, res) => {
     try {
-        const orders = await orderService.getUserOrders(req.user.id);
-        res.json({ success: true, data: orders });
+        const { date, limit, offset } = req.query;
+        const result = await orderService.getUserOrders(req.user.id, { date, limit, offset });
+        res.json({ success: true, data: result.orders, total: result.total, confirmedCount: result.confirmedCount });
     } catch (error) {
         console.error(error);
         const statusCode = error.message.includes('not found') ? 404 : 500;

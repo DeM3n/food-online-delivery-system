@@ -2,12 +2,21 @@ const { Order, Customer, Restaurant, DeliveryPartner, User, OrderItem, Address, 
 const { Op } = require('sequelize');
 
 class OrderService {
-    async getRestaurantOrders(userId) {
+    async getRestaurantOrders(userId, statusFilter) {
         const restaurant = await Restaurant.findOne({ where: { user_id: userId } });
         if (!restaurant) throw new Error('Restaurant not found for this user');
 
-        return await Order.findAll({
-            where: { restaurant_id: restaurant.id },
+        const where = { restaurant_id: restaurant.id };
+        if (statusFilter && statusFilter !== 'all') {
+            if (statusFilter === 'delivered') {
+                where.status = { [Op.in]: ['delivered', 'completed'] };
+            } else {
+                where.status = statusFilter;
+            }
+        }
+
+        const orders = await Order.findAll({
+            where,
             include: [
                 {
                     model: Customer,
@@ -20,14 +29,50 @@ class OrderService {
             ],
             order: [['created_at', 'DESC']]
         });
+
+        // Get counts for each status
+        const statusCounts = await Order.findAll({
+            attributes: ['status', [sequelize.fn('COUNT', sequelize.col('status')), 'count']],
+            where: { restaurant_id: restaurant.id },
+            group: ['status'],
+            raw: true
+        });
+
+        const counts = {
+            pending: 0,
+            accepted: 0,
+            preparing: 0,
+            picked_up: 0,
+            delivered: 0,
+            cancelled: 0
+        };
+
+        statusCounts.forEach(sc => {
+            if (sc.status === 'completed') {
+                counts.delivered += parseInt(sc.count);
+            } else if (counts.hasOwnProperty(sc.status)) {
+                counts[sc.status] += parseInt(sc.count);
+            }
+        });
+
+        return { orders, counts };
     }
 
-    async getUserOrders(userId) {
+    async getUserOrders(userId, { date, limit = 5, offset = 0 } = {}) {
         const customer = await Customer.findOne({ where: { user_id: userId } });
         if (!customer) throw new Error('Customer not found');
 
-        return await Order.findAll({
-            where: { customer_id: customer.id },
+        const where = { customer_id: customer.id };
+        if (date) {
+            const startOfDay = new Date(date);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(date);
+            endOfDay.setHours(23, 59, 59, 999);
+            where.created_at = { [Op.between]: [startOfDay, endOfDay] };
+        }
+
+        const { count, rows } = await Order.findAndCountAll({
+            where,
             include: [
                 { model: Restaurant, attributes: ['name'] },
                 { model: OrderItem, include: [{ model: MenuItem }] },
@@ -36,8 +81,19 @@ class OrderService {
                     include: [{ model: User, attributes: ['full_name', 'phone_number'] }] 
                 }
             ],
-            order: [['created_at', 'DESC']]
+            order: [['created_at', 'DESC']],
+            limit: parseInt(limit),
+            offset: parseInt(offset)
         });
+
+        const confirmedCount = await Order.count({
+            where: {
+                customer_id: customer.id,
+                status: { [Op.in]: ['delivered', 'completed'] }
+            }
+        });
+
+        return { orders: rows, total: count, confirmedCount };
     }
 
     async getMonthlyFavorite(userId) {

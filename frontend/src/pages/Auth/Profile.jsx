@@ -25,15 +25,22 @@ export default function Profile() {
     const dispatch = useDispatch();
     const [loading, setLoading] = useState(false);
     const [orders, setOrders] = useState([]);
+    const [totalOrders, setTotalOrders] = useState(0);
+    const [confirmedOrders, setConfirmedOrders] = useState(0);
+    const [dateFilter, setDateFilter] = useState('');
+    const [limit, setLimit] = useState(5);
     const [favoriteRestaurant, setFavoriteRestaurant] = useState(null);
     const [addresses, setAddresses] = useState([]);
 
-    const fetchUserOrders = async () => {
+    const fetchUserOrders = async (currentDate = dateFilter, currentLimit = limit) => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.get(`http://localhost:5001/api/orders/me`, config);
+            const query = `?date=${currentDate}&limit=${currentLimit}`;
+            const response = await axios.get(`http://localhost:5001/api/orders/me${query}`, config);
             if (response.data.success) {
                 setOrders(response.data.data);
+                setTotalOrders(response.data.total);
+                setConfirmedOrders(response.data.confirmedCount || 0);
             }
         } catch (error) {
             console.error('Error fetching orders:', error);
@@ -244,9 +251,9 @@ export default function Profile() {
                                     </div>
 
                                     <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
-                                        <h3 className="text-xl font-bold text-gray-800 mb-2">Total Orders</h3>
-                                        <p className="text-4xl font-black text-blue-600">{orders.length}</p>
-                                        <p className="text-sm text-gray-500 mt-1">Orders placed so far</p>
+                                        <h3 className="text-xl font-bold text-gray-800 mb-2">Confirmed Orders</h3>
+                                        <p className="text-4xl font-black text-blue-600">{confirmedOrders}</p>
+                                        <p className="text-sm text-gray-500 mt-1">Total completed deliveries</p>
                                     </div>
                                 </>
                             )}
@@ -258,10 +265,38 @@ export default function Profile() {
             {/* Order History Section */}
             {user.role === 'customer' && (
                 <div className="bg-white rounded-3xl shadow-soft p-10 border border-gray-100">
-                    <h3 className="text-2xl font-bold text-gray-800 mb-8 flex items-center gap-2">
-                        <span className="w-2 h-8 bg-primary rounded-full"></span>
-                        Order History
-                    </h3>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                        <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                            <span className="w-2 h-8 bg-primary rounded-full"></span>
+                            Order History
+                        </h3>
+                        
+                        <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-xl border border-gray-100 w-full md:w-auto">
+                            <label className="text-xs font-bold text-gray-500 uppercase ml-2">Filter by Date:</label>
+                            <input 
+                                type="date" 
+                                value={dateFilter}
+                                onChange={(e) => {
+                                    setDateFilter(e.target.value);
+                                    setLimit(5); // Reset limit when changing date
+                                    fetchUserOrders(e.target.value, 5);
+                                }}
+                                className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-primary transition-colors"
+                            />
+                            {dateFilter && (
+                                <button 
+                                    onClick={() => {
+                                        setDateFilter('');
+                                        setLimit(5);
+                                        fetchUserOrders('', 5);
+                                    }}
+                                    className="text-xs text-gray-400 hover:text-red-500 font-bold px-2"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+                    </div>
 
                     {orders.length > 0 ? (
                         <div className="overflow-x-auto">
@@ -298,6 +333,21 @@ export default function Profile() {
                                     ))}
                                 </tbody>
                             </table>
+
+                            {orders.length < totalOrders && (
+                                <div className="mt-8 flex justify-center">
+                                    <button 
+                                        onClick={() => {
+                                            const newLimit = limit + 5;
+                                            setLimit(newLimit);
+                                            fetchUserOrders(dateFilter, newLimit);
+                                        }}
+                                        className="btn-secondary px-8 py-2 text-sm shadow-sm md:hover:scale-105 transition-transform"
+                                    >
+                                        Show More Orders
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="text-center py-10">
