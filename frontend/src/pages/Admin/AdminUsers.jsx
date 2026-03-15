@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { useSelector } from 'react-redux';
 import { UserOutlined, MailOutlined, PhoneOutlined, SafetyOutlined } from '@ant-design/icons';
 
@@ -11,8 +11,7 @@ export default function AdminUsers() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        const response = await axios.get('http://localhost:5001/api/admin/users', config);
+        const response = await axios.get('/admin/users');
         if (response.data.success) {
           setUsers(response.data.data);
         }

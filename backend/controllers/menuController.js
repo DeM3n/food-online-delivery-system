@@ -53,7 +53,7 @@ exports.createMenuItem = async (req, res) => {
 // @route   PUT /api/menu/:id
 exports.updateMenuItem = async (req, res) => {
     try {
-        const item = await menuService.updateMenuItem(req.params.id, req.user.id, req.body);
+        const item = await menuService.updateMenuItem(req.params.id, req.user.id, req.body, req.io);
         res.json({ success: true, data: item });
     } catch (error) {
         console.error(error);

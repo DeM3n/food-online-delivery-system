@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { addToCartAsync } from '../../redux/slices/cartSlice';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { notification } from 'antd';
 import socket from '../../socket';
 
@@ -19,8 +19,8 @@ export default function RestaurantMenu() {
         const fetchMenuData = async () => {
             try {
                 const [resResponse, menuResponse] = await Promise.all([
-                    axios.get(`http://localhost:5001/api/restaurants/${restaurantId}`),
-                    axios.get(`http://localhost:5001/api/menu/full/${restaurantId}`)
+                    axios.get(`/restaurants/${restaurantId}`),
+                    axios.get(`/menu/full/${restaurantId}`)
                 ]);
 
                 if (resResponse.data.success) {
@@ -39,12 +39,13 @@ export default function RestaurantMenu() {
 
         // Real-time menu updates
         socket.on('MENU_ITEM_UPDATED', (data) => {
-            if (data.restaurantId === restaurantId) {
+            console.log('Real-time menu update received:', data);
+            if (String(data.restaurantId) === String(restaurantId)) {
                 setMenu(prevMenu => prevMenu.map(category => ({
                     ...category,
                     MenuItems: category.MenuItems?.map(item => 
-                        item.id === data.itemId 
-                            ? { ...item, is_available: data.isAvailable } 
+                        String(item.id) === String(data.itemId) 
+                            ? { ...item, ...data } 
                             : item
                     )
                 })));

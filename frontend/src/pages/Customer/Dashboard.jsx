@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../../api/axios';
 
 const mockOffers = [
   { id: 1, title: '50% Off First Order!', img: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&h=300&fit=crop' },
@@ -16,7 +16,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axios.get('http://localhost:5001/api/menu/global-categories');
+        const response = await axios.get('/menu/global-categories');
         if (response.data.success) {
           setCategories(response.data.data);
         }

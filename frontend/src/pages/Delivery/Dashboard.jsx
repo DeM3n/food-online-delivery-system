@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import axios from 'axios';
+import axios from '../../api/axios';
 
 export default function DeliveryDashboard() {
   const { profile, token } = useSelector(state => state.auth);
@@ -10,8 +10,7 @@ export default function DeliveryDashboard() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        const { data } = await axios.get(`http://localhost:5001/api/orders/driver/me/history`, config);
+        const { data } = await axios.get('/orders/driver/me/history');
         
         if (data.success) {
           setHistory(data.data);

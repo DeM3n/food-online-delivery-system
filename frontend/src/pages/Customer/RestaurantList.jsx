@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../../api/axios';
 
 export default function RestaurantList() {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ export default function RestaurantList() {
     const fetchRestaurants = async () => {
       try {
         setLoading(true);
-        let url = 'http://localhost:5001/api/restaurants';
+        let url = '/restaurants';
         const params = new URLSearchParams();
         if (searchParam) params.append('search', searchParam);
         if (categoryParam) params.append('category', categoryParam);

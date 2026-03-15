@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { 
     PlusOutlined, 
     EditOutlined, 
@@ -44,8 +44,7 @@ export default function MenuManagement() {
 
     const fetchCategories = async () => {
         try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.get(`http://localhost:5001/api/menu/categories/${profile.id}`, config);
+            const response = await axios.get(`/menu/categories/${profile.id}`);
             if (response.data.success) {
                 setCategories(response.data.data);
             }
@@ -57,12 +56,11 @@ export default function MenuManagement() {
     const fetchMenu = async (currentPage = page, currentSearch = search, currentCategory = selectedCategory) => {
         setLoading(true);
         try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            let url = `http://localhost:5001/api/menu?restaurantId=${profile.id}&page=${currentPage}&limit=9`;
+            let url = `/menu?restaurantId=${profile.id}&page=${currentPage}&limit=9`;
             if (currentSearch) url += `&search=${currentSearch}`;
             if (currentCategory) url += `&categoryId=${currentCategory}`;
 
-            const response = await axios.get(url, config);
+            const response = await axios.get(url);
             if (response.data.success) {
                 setItems(response.data.items);
                 setTotal(response.data.totalItems);
@@ -110,13 +108,12 @@ export default function MenuManagement() {
     const handleOk = async () => {
         try {
             const values = await form.validateFields();
-            const config = { headers: { Authorization: `Bearer ${token}` } };
             
             if (editingItem) {
-                await axios.put(`http://localhost:5001/api/menu/${editingItem.id}`, values, config);
+                await axios.put(`/menu/${editingItem.id}`, values);
                 notification.success({ message: 'Item updated successfully' });
             } else {
-                await axios.post('http://localhost:5001/api/menu', values, config);
+                await axios.post('/menu', values);
                 notification.success({ message: 'Item created successfully' });
             }
             
@@ -130,8 +127,7 @@ export default function MenuManagement() {
 
     const handleDelete = async (id) => {
         try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.delete(`http://localhost:5001/api/menu/${id}`, config);
+            await axios.delete(`/menu/${id}`);
             notification.success({ message: 'Item deleted' });
             fetchMenu();
         } catch (error) {
@@ -141,8 +137,7 @@ export default function MenuManagement() {
 
     const toggleAvailability = async (id) => {
         try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.patch(`http://localhost:5001/api/menu/${id}/toggle-availability`, {}, config);
+            await axios.patch(`/menu/${id}/toggle-availability`, {});
             fetchMenu();
         } catch (error) {
             notification.error({ message: 'Failed to update availability' });

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import axios from 'axios';
+import axios from './api/axios';
 import socket from './socket';
 import { loginSuccess, logout as logoutAction } from './redux/slices/authSlice';
 import { fetchCart, resetCartState } from './redux/slices/cartSlice';
@@ -43,10 +43,7 @@ function App() {
     const fetchUser = async () => {
       if (token && !user) {
         try {
-          const config = {
-            headers: { Authorization: `Bearer ${token}` }
-          };
-          const response = await axios.get('http://localhost:5001/api/auth/profile', config);
+          const response = await axios.get('/auth/profile');
           if (response.data.success) {
             const data = response.data.data;
             // Determine which profile is active

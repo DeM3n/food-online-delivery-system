@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { UserOutlined, ShopOutlined, TeamOutlined, DollarOutlined, ArrowRightOutlined, HistoryOutlined } from '@ant-design/icons';
@@ -12,8 +12,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        const response = await axios.get('http://localhost:5001/api/admin/stats', config);
+        const response = await axios.get('/admin/stats');
         if (response.data.success) {
           setStats(response.data.data);
         }

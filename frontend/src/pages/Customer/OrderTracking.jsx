@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import axios from 'axios';
+import axios from '../../api/axios';
 import socket from '../../socket';
 import { 
   CheckCircleFilled, 
@@ -63,8 +63,7 @@ const OrderTracking = () => {
 
   const handleAcknowledge = async (orderId) => {
     try {
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.put(`http://localhost:5001/api/orders/${orderId}/status`, { status: 'completed' }, config);
+      await axios.put(`/orders/${orderId}/status`, { status: 'completed' });
       message.success('Tracking closed. You can view this order in history.');
       fetchOrders();
     } catch (error) {
@@ -77,10 +76,7 @@ const OrderTracking = () => {
     
     try {
       setLoading(true);
-      const config = {
-        headers: { Authorization: `Bearer ${token}` }
-      };
-      const response = await axios.get('http://localhost:5001/api/orders/me', config);
+      const response = await axios.get('/orders/me');
       if (response.data.success) {
         setOrders(response.data.data);
       }
@@ -104,10 +100,7 @@ const OrderTracking = () => {
       cancelText: 'No',
       onOk: async () => {
         try {
-          const config = {
-            headers: { Authorization: `Bearer ${token}` }
-          };
-          const response = await axios.put(`http://localhost:5001/api/orders/${orderId}/cancel`, {}, config);
+          const response = await axios.put(`/orders/${orderId}/cancel`, {});
           if (response.data.success) {
             message.success('Order cancelled successfully');
             setOrders(prevOrders => 

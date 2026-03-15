@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { loginSuccess } from '../../redux/slices/authSlice';
 import { notification } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
@@ -34,9 +34,8 @@ export default function Profile() {
 
     const fetchUserOrders = async (currentDate = dateFilter, currentLimit = limit) => {
         try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
             const query = `?date=${currentDate}&limit=${currentLimit}`;
-            const response = await axios.get(`http://localhost:5001/api/orders/me${query}`, config);
+            const response = await axios.get(`/orders/me${query}`);
             if (response.data.success) {
                 setOrders(response.data.data);
                 setTotalOrders(response.data.total);
@@ -69,8 +68,7 @@ export default function Profile() {
 
     const fetchFavoriteRestaurant = async () => {
         try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.get(`http://localhost:5001/api/orders/me/favorite`, config);
+            const response = await axios.get(`/orders/me/favorite`);
             if (response.data.success) {
                 setFavoriteRestaurant(response.data.data);
             }
@@ -119,11 +117,7 @@ export default function Profile() {
                                 onSubmit={async (values, { setSubmitting }) => {
                                     try {
                                         setLoading(true);
-                                        const config = {
-                                            headers: { Authorization: `Bearer ${token}` }
-                                        };
-
-                                        const response = await axios.put('http://localhost:5001/api/auth/profile', values, config);
+                                        const response = await axios.put('/auth/profile', values);
 
                                         if (response.data.success) {
                                             const updatedData = response.data.data;

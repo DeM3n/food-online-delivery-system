@@ -5,7 +5,7 @@ import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../../redux/slices/authSlice';
 import { fetchCart } from '../../redux/slices/cartSlice';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../../api/axios';
 
 const LoginSchema = Yup.object().shape({
   email: Yup.string().email('Invalid email').required('Required'),
@@ -45,7 +45,7 @@ export default function Login() {
             try {
               setError('');
               // Connecting to real backend
-              const response = await axios.post('http://localhost:5001/api/auth/login', values);
+              const response = await axios.post('/auth/login', values);
               const { data } = response.data;
 
               dispatch(loginSuccess({

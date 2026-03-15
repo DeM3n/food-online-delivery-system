@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { notification } from 'antd';
 import { CheckCircleOutlined, SyncOutlined, ClockCircleOutlined, CarOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import socket from '../../socket';
@@ -21,8 +21,7 @@ export default function RestaurantOrders() {
   const fetchOrders = async (status = selectedStatus) => {
     try {
       setLoading(true);
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      const { data } = await axios.get(`http://localhost:5001/api/orders/restaurant/me?status=${status}`, config);
+      const { data } = await axios.get(`/orders/restaurant/me?status=${status}`);
       if (data.success) {
         setOrders(data.data);
         if (data.counts) {
@@ -71,8 +70,7 @@ export default function RestaurantOrders() {
 
   const updateStatus = async (orderId, newStatus) => {
     try {
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      const { data } = await axios.put(`http://localhost:5001/api/orders/${orderId}/status`, { status: newStatus }, config);
+      const { data } = await axios.put(`/orders/${orderId}/status`, { status: newStatus });
       if (data.success) {
         notification.success({ message: `Order marked as ${newStatus}` });
         fetchOrders(); // Refresh

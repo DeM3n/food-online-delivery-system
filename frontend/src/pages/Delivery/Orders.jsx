@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { notification, Modal } from 'antd';
 import { 
   ShopOutlined, 
@@ -23,10 +23,9 @@ export default function DeliveryOrders() {
 
   const fetchDeliveries = async () => {
     try {
-      const config = { headers: { Authorization: `Bearer ${token}` } };
       const [availableRes, activeRes] = await Promise.all([
-        axios.get('http://localhost:5001/api/orders/deliveries/available', config),
-        axios.get(`http://localhost:5001/api/orders/driver/me`, config)
+        axios.get('/orders/deliveries/available'),
+        axios.get('/orders/driver/me')
       ]);
       
       if (availableRes.data.success) {
@@ -72,8 +71,7 @@ export default function DeliveryOrders() {
 
   const acceptRequest = async (orderId) => {
     try {
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      const { data } = await axios.put(`http://localhost:5001/api/orders/${orderId}/accept-delivery`, { driver_id: profile.id }, config);
+      const { data } = await axios.put(`/orders/${orderId}/accept-delivery`, { driver_id: profile.id });
       if (data.success) {
         notification.success({ message: 'Delivery Accepted!' });
         fetchDeliveries();
@@ -86,8 +84,7 @@ export default function DeliveryOrders() {
 
   const updateStatus = async (orderId, newStatus) => {
     try {
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      const { data } = await axios.put(`http://localhost:5001/api/orders/${orderId}/status`, { status: newStatus }, config);
+      const { data } = await axios.put(`/orders/${orderId}/status`, { status: newStatus });
       if (data.success) {
         notification.success({ message: `Order marked as ${newStatus}!` });
         fetchDeliveries();

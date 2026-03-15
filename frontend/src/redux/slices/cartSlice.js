@@ -1,39 +1,33 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import axios from '../../api/axios';
 
-// API BASE URL
-const API_URL = 'http://localhost:5001/api/cart';
-
-// Utility to get config
-const getThunkConfig = (thunkAPI) => {
-    const token = thunkAPI.getState().auth.token;
-    return { headers: { Authorization: `Bearer ${token}` } };
-};
+// API BASE PATH
+const API_URL = '/cart';
 
 // Async Thunks
 export const fetchCart = createAsyncThunk('cart/fetch', async (_, thunkAPI) => {
-    const response = await axios.get(API_URL, getThunkConfig(thunkAPI));
+    const response = await axios.get(API_URL);
     return response.data.data; // This will be the Cart object with CartItems
 });
 
 export const addToCartAsync = createAsyncThunk('cart/add', async (itemData, thunkAPI) => {
     // itemData: { menu_item_id, quantity, restaurant_id }
-    await axios.post(`${API_URL}/items`, itemData, getThunkConfig(thunkAPI));
+    await axios.post(`${API_URL}/items`, itemData);
     thunkAPI.dispatch(fetchCart());
 });
 
 export const updateQuantityAsync = createAsyncThunk('cart/updateQuantity', async ({ itemId, quantity }, thunkAPI) => {
-    await axios.put(`${API_URL}/items/${itemId}`, { quantity }, getThunkConfig(thunkAPI));
+    await axios.put(`${API_URL}/items/${itemId}`, { quantity });
     thunkAPI.dispatch(fetchCart());
 });
 
 export const removeItemAsync = createAsyncThunk('cart/removeItem', async (itemId, thunkAPI) => {
-    await axios.delete(`${API_URL}/items/${itemId}`, getThunkConfig(thunkAPI));
+    await axios.delete(`${API_URL}/items/${itemId}`);
     thunkAPI.dispatch(fetchCart());
 });
 
 export const clearCartAsync = createAsyncThunk('cart/clear', async (_, thunkAPI) => {
-    await axios.delete(API_URL, getThunkConfig(thunkAPI));
+    await axios.delete(API_URL);
     return null;
 });
 

@@ -43,7 +43,7 @@ class MenuService {
         });
     }
 
-    async updateMenuItem(itemId, restaurantUserId, updateData) {
+    async updateMenuItem(itemId, restaurantUserId, updateData, io) {
         const restaurant = await Restaurant.findOne({ where: { user_id: restaurantUserId } });
         const item = await MenuItem.findByPk(itemId);
 
@@ -53,6 +53,20 @@ class MenuService {
         }
 
         await item.update(updateData);
+
+        // Emit real-time update
+        if (io) {
+            io.emit('MENU_ITEM_UPDATED', {
+                itemId: item.id,
+                is_available: item.is_available,
+                name: item.name,
+                restaurantId: item.restaurant_id,
+                price: item.price,
+                description: item.description,
+                image_url: item.image_url
+            });
+        }
+
         return item;
     }
 
@@ -72,9 +86,12 @@ class MenuService {
         if (io) {
             io.emit('MENU_ITEM_UPDATED', {
                 itemId: item.id,
-                isAvailable: newStatus,
+                is_available: newStatus,
                 name: item.name,
-                restaurantId: item.restaurant_id
+                restaurantId: item.restaurant_id,
+                price: item.price,
+                description: item.description,
+                image_url: item.image_url
             });
         }
 

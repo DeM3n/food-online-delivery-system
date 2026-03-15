@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { clearCartAsync, fetchCart } from '../../redux/slices/cartSlice';
 import { notification, Modal } from 'antd';
 import { CreditCardOutlined, MoneyCollectOutlined, HomeOutlined, PhoneOutlined, MessageOutlined } from '@ant-design/icons';
@@ -34,19 +34,18 @@ export default function CheckoutPage() {
         try {
             setLoading(true);
             const orderData = {
-                restaurant_id: "cd1e81cf-8f4c-4c8a-8e97-afda83106a8a",
-                delivery_address_id: "1e30bb6d-df57-4e48-a287-d03393565862",
-                notes: "Test thanh toán VNPay",
+                restaurant_id: restaurantId,
+                delivery_address_id: profile?.Addresses?.[0]?.id,
+                notes: notes || "No notes provided",
                 payment_method: paymentMethod,
-                items,
+                items: items.map(item => ({
+                    menu_item_id: item.menu_item_id || item.id,
+                    quantity: item.quantity
+                })),
                 delivery_fee: deliveryFee
             };
 
-            const config = {
-                headers: { Authorization: `Bearer ${token}` }
-            };
-
-            const response = await axios.post('http://localhost:5001/api/orders', orderData, config);
+            const response = await axios.post('/orders', orderData);
 
             if (response.data.success) {
                 notification.success({

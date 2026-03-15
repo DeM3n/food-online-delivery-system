@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../../api/axios';
 import { useSelector } from 'react-redux';
 import {
   SyncOutlined,
@@ -30,7 +30,7 @@ export default function AdminOrders() {
 
   const fetchRestaurants = async () => {
     try {
-      const response = await axios.get('http://localhost:5001/api/restaurants');
+      const response = await axios.get('/restaurants');
       if (response.data.success) {
         setRestaurants(response.data.data);
       }
@@ -42,11 +42,10 @@ export default function AdminOrders() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      let url = `http://localhost:5001/api/admin/orders?status=${selectedStatus}`;
+      let url = `/admin/orders?status=${selectedStatus}`;
       if (selectedRestaurant) url += `&restaurantId=${selectedRestaurant}`;
 
-      const response = await axios.get(url, config);
+      const response = await axios.get(url);
       if (response.data.success) {
         setOrders(response.data.data);
         if (response.data.counts) {

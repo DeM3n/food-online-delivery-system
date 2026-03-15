@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import axios from 'axios';
+import axios from '../../api/axios';
 import socket from '../../socket';
 import { notification } from 'antd';
 
@@ -12,10 +12,9 @@ export default function RestaurantDashboard() {
 
   const fetchData = async () => {
     try {
-      const config = { headers: { Authorization: `Bearer ${token}` } };
       const [ordersRes, menuRes] = await Promise.all([
-        axios.get(`http://localhost:5001/api/orders/restaurant/me`, config),
-        axios.get(`http://localhost:5001/api/menu/full/${profile.id}`, config)
+        axios.get('/orders/restaurant/me'),
+        axios.get(`/menu/full/${profile.id}`)
       ]);
 
       if (ordersRes.data.success) {

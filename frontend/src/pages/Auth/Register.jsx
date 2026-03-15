@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../../api/axios';
 
 const RegisterSchema = Yup.object().shape({
     full_name: Yup.string().required('Full name is required'),
@@ -40,7 +40,7 @@ export default function Register() {
                     onSubmit={async (values, { setSubmitting }) => {
                         try {
                             setError('');
-                            const response = await axios.post('http://localhost:5001/api/auth/register', values);
+                            const response = await axios.post('/auth/register', values);
                             if (response.data.success) {
                                 setSuccess('Registration successful! Redirecting...');
                                 setTimeout(() => navigate('/login'), 2000);
