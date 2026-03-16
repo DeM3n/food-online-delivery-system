@@ -5,8 +5,8 @@ const orderService = require('../services/orderService');
 // @access  Private
 exports.getRestaurantOrders = async (req, res) => {
     try {
-        const { status } = req.query;
-        const result = await orderService.getRestaurantOrders(req.user.id, status);
+        const { status, date } = req.query;
+        const result = await orderService.getRestaurantOrders(req.user.id, status, date);
         res.json({ success: true, data: result.orders, counts: result.counts });
     } catch (error) {
         console.error(error);
@@ -152,6 +152,21 @@ exports.getDriverHistory = async (req, res) => {
     try {
         const orders = await orderService.getDriverHistory(req.user.id);
         res.json({ success: true, data: orders });
+    } catch (error) {
+        console.error(error);
+        const statusCode = error.message.includes('not found') ? 404 : 500;
+        res.status(statusCode).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Get yearly summary for restaurant
+// @route   GET /api/orders/restaurant/me/yearly-summary
+// @access  Private
+exports.getRestaurantYearlySummary = async (req, res) => {
+    try {
+        const { year } = req.query;
+        const data = await orderService.getRestaurantYearlySummary(req.user.id, year);
+        res.json({ success: true, data });
     } catch (error) {
         console.error(error);
         const statusCode = error.message.includes('not found') ? 404 : 500;

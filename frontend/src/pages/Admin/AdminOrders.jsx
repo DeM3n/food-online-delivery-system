@@ -27,6 +27,10 @@ export default function AdminOrders() {
     cancelled: 0
   });
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const fetchRestaurants = async () => {
     try {
@@ -42,7 +46,7 @@ export default function AdminOrders() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      let url = `/admin/orders?status=${selectedStatus}`;
+      let url = `/admin/orders?status=${selectedStatus}&page=${currentPage}&limit=${pageSize}`;
       if (selectedRestaurant) url += `&restaurantId=${selectedRestaurant}`;
 
       const response = await axios.get(url);
@@ -50,6 +54,10 @@ export default function AdminOrders() {
         setOrders(response.data.data);
         if (response.data.counts) {
           setCounts(response.data.counts);
+        }
+        if (response.data.pagination) {
+          setTotalOrders(response.data.pagination.total || 0);
+          setTotalPages(response.data.pagination.totalPages || 1);
         }
       }
     } catch (error) {
@@ -65,7 +73,11 @@ export default function AdminOrders() {
 
   useEffect(() => {
     fetchOrders();
-  }, [selectedRestaurant, selectedStatus]);
+  }, [selectedRestaurant, selectedStatus, currentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedRestaurant, selectedStatus, pageSize]);
 
   const statusTabs = [
     { key: 'pending', label: 'Pending', icon: <ClockCircleOutlined />, color: 'text-yellow-500', bg: 'bg-yellow-50' },
@@ -200,6 +212,43 @@ export default function AdminOrders() {
             </div>
             <h3 className="font-black text-gray-800 text-lg mb-2">No {selectedStatus} orders</h3>
             <p className="text-sm max-w-[250px] mx-auto text-gray-400 font-medium">There are currently no orders with this status for the selected criteria.</p>
+          </div>
+        )}
+
+        {!loading && totalOrders > 0 && (
+          <div className="px-6 md:px-8 py-4 border-t border-gray-100 bg-gray-50/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div className="text-xs font-semibold text-gray-500">
+              Showing {Math.min((currentPage - 1) * pageSize + 1, totalOrders)}-
+              {Math.min(currentPage * pageSize, totalOrders)} of {totalOrders} orders
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                className="h-9 px-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600"
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+              >
+                {[10, 20, 50, 100].map(size => (
+                  <option key={size} value={size}>{size} / page</option>
+                ))}
+              </select>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="h-9 px-3 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Prev
+              </button>
+              <span className="text-xs font-bold text-gray-600 min-w-[70px] text-center">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage >= totalPages}
+                className="h-9 px-3 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

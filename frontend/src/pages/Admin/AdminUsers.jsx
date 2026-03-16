@@ -24,6 +24,27 @@ export default function AdminUsers() {
     fetchUsers();
   }, [token]);
 
+  const updateUserStatus = async (userId, currentStatus) => {
+    const nextStatus = !currentStatus;
+    const confirmMessage = nextStatus
+      ? 'Activate this account?'
+      : 'Deactivate this account?';
+
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      const response = await axios.put(`/admin/users/${userId}/status`, { is_active: nextStatus });
+      if (response.data.success) {
+        setUsers(prev => prev.map(user => (
+          user.id === userId ? { ...user, is_active: nextStatus } : user
+        )));
+      }
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      alert(error.response?.data?.message || 'Failed to update user status');
+    }
+  };
+
   const getRoleBadge = (role) => {
     switch (role) {
       case 'admin': return <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-red-200">Admin</span>;
@@ -32,6 +53,12 @@ export default function AdminUsers() {
       default: return <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-blue-200">Customer</span>;
     }
   };
+
+  const getAccountStatusBadge = (isActive) => (
+    isActive
+      ? <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-green-200">Active</span>
+      : <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-gray-200">Inactive</span>
+  );
 
   return (
     <div className="animate-fade-in max-w-6xl mx-auto p-4 md:p-0">
@@ -53,6 +80,7 @@ export default function AdminUsers() {
                   <th className="p-6">User Details</th>
                   <th className="p-6">Contact</th>
                   <th className="p-6">Role</th>
+                  <th className="p-6">Account Status</th>
                   <th className="p-6">Joined Date</th>
                   <th className="p-6 text-right">Actions</th>
                 </tr>
@@ -85,13 +113,23 @@ export default function AdminUsers() {
                       {getRoleBadge(user.role)}
                     </td>
                     <td className="p-6">
+                      {getAccountStatusBadge(user.is_active)}
+                    </td>
+                    <td className="p-6">
                       <div className="text-xs text-gray-500 font-medium">
                         {new Date(user.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </div>
                     </td>
                     <td className="p-6 text-right">
-                      <button className="text-xs font-bold text-primary hover:text-orange-600 transition-colors uppercase tracking-widest">
-                        Manage
+                      <button
+                        onClick={() => updateUserStatus(user.id, user.is_active)}
+                        className={`text-xs font-bold transition-colors uppercase tracking-widest ${
+                          user.is_active
+                            ? 'text-red-600 hover:text-red-700'
+                            : 'text-green-600 hover:text-green-700'
+                        }`}
+                      >
+                        {user.is_active ? 'Deactivate' : 'Activate'}
                       </button>
                     </td>
                   </tr>

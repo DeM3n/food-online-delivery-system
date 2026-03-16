@@ -23,8 +23,10 @@ import OrderTracking from './pages/Customer/OrderTracking';
 import RestaurantDashboard from './pages/Restaurant/Dashboard';
 import RestaurantOrders from './pages/Restaurant/Orders';
 import MenuManagement from './pages/Restaurant/MenuManagement';
+import RestaurantSummary from './pages/Restaurant/Summary';
 import DeliveryDashboard from './pages/Delivery/Dashboard';
 import DeliveryOrders from './pages/Delivery/Orders';
+import DriverSummary from './pages/Delivery/Summary';
 import AdminDashboard from './pages/Admin/Dashboard';
 import AdminUsers from './pages/Admin/AdminUsers';
 import AdminOrders from './pages/Admin/AdminOrders';
@@ -141,6 +143,7 @@ function App() {
           <Route index element={<RestaurantDashboard />} />
           <Route path="menu" element={<MenuManagement />} />
           <Route path="orders" element={<RestaurantOrders />} />
+          <Route path="summary" element={<RestaurantSummary />} />
           <Route path="profile" element={<Profile />} />
         </Route>
 
@@ -148,6 +151,7 @@ function App() {
         <Route path="/delivery" element={<DeliveryLayout />}>
           <Route index element={<DeliveryDashboard />} />
           <Route path="orders" element={<DeliveryOrders />} />
+          <Route path="summary" element={<DriverSummary />} />
           <Route path="map" element={<div>Google Maps Tracking</div>} />
           <Route path="profile" element={<Profile />} />
         </Route>

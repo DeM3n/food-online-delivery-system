@@ -65,7 +65,19 @@ export default function RestaurantDashboard() {
 
   const stats = [
     { label: "Total Orders", value: orders.length, color: "border-primary" },
-    { label: "Revenue", value: `${orders.reduce((acc, o) => acc + (o.total_amount || 0), 0).toLocaleString()}đ`, color: "border-secondary" },
+    {
+      label: "Revenue",
+      value: `${orders.reduce((acc, o) => {
+        const subtotal = Number(o.subtotal);
+        const total = Number(o.total_amount || 0);
+        const deliveryFee = Number(o.delivery_fee || 0);
+        const restaurantAmount = Number.isFinite(subtotal)
+          ? subtotal
+          : Math.max(total - deliveryFee, 0);
+        return acc + restaurantAmount;
+      }, 0).toLocaleString()}đ`,
+      color: "border-secondary"
+    },
     { label: "Restaurant Rating", value: `${profile?.rating || 'N/A'} ⭐`, color: "border-accent" },
   ];
 

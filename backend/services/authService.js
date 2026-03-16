@@ -65,6 +65,10 @@ class AuthService {
         });
 
         if (user && (await user.matchPassword(password))) {
+            if (!user.is_active) {
+                throw new Error('Account has been deactivated. Please contact support.');
+            }
+
             let profile = null;
             if (user.Customer) profile = user.Customer;
             else if (user.Restaurant) profile = user.Restaurant;

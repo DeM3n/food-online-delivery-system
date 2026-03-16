@@ -26,12 +26,35 @@ class AdminService {
 
     async getAllUsers() {
         return await User.findAll({
-            attributes: ['id', 'email', 'full_name', 'phone_number', 'role', 'created_at'],
+            attributes: ['id', 'email', 'full_name', 'phone_number', 'role', 'is_active', 'created_at'],
             order: [['created_at', 'DESC']]
         });
     }
 
-    async getAllOrders(restaurantId, statusFilter) {
+    async updateUserStatus(userId, isActive, currentAdminId) {
+        if (typeof isActive !== 'boolean') {
+            throw new Error('is_active is required and must be boolean');
+        }
+
+        if (userId === currentAdminId && !isActive) {
+            throw new Error('Cannot deactivate your own admin account');
+        }
+
+        const user = await User.findByPk(userId);
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        user.is_active = isActive;
+        await user.save();
+
+        return {
+            id: user.id,
+            is_active: user.is_active
+        };
+    }
+
+    async getAllOrders(restaurantId, statusFilter, page = 1, limit = 20) {
         const where = {};
         if (restaurantId) {
             where.restaurant_id = restaurantId;
@@ -45,12 +68,18 @@ class AdminService {
             }
         }
 
-        const orders = await Order.findAll({
+        const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+        const parsedLimit = Math.max(parseInt(limit, 10) || 20, 1);
+        const offset = (parsedPage - 1) * parsedLimit;
+
+        const { count: total, rows: orders } = await Order.findAndCountAll({
             where,
             include: [
                 { model: Restaurant, attributes: ['name'] },
                 { model: Customer, include: [{ model: User, attributes: ['full_name'] }] }
             ],
+            limit: parsedLimit,
+            offset,
             order: [['created_at', 'DESC']]
         });
 
@@ -82,7 +111,16 @@ class AdminService {
             }
         });
 
-        return { orders, counts };
+        return {
+            orders,
+            counts,
+            pagination: {
+                total,
+                page: parsedPage,
+                limit: parsedLimit,
+                totalPages: Math.max(Math.ceil(total / parsedLimit), 1)
+            }
+        };
     }
 }
 

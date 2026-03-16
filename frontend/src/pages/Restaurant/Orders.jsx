@@ -5,6 +5,11 @@ import { notification } from 'antd';
 import { CheckCircleOutlined, SyncOutlined, ClockCircleOutlined, CarOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import socket from '../../socket';
 
+const getTodayDateString = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+};
+
 export default function RestaurantOrders() {
   const { profile, token, user } = useSelector(state => state.auth);
   const [orders, setOrders] = useState([]);
@@ -13,15 +18,22 @@ export default function RestaurantOrders() {
     accepted: 0,
     preparing: 0,
     picked_up: 0,
-    delivered: 0
+    delivered: 0,
+    cancelled: 0
   });
   const [selectedStatus, setSelectedStatus] = useState('pending');
+  const [selectedDate, setSelectedDate] = useState(getTodayDateString());
   const [loading, setLoading] = useState(true);
 
-  const fetchOrders = async (status = selectedStatus) => {
+  const fetchOrders = async (status = selectedStatus, date = selectedDate) => {
     try {
       setLoading(true);
-      const { data } = await axios.get(`/orders/restaurant/me?status=${status}`);
+      const { data } = await axios.get('/orders/restaurant/me', {
+        params: {
+          status,
+          date
+        }
+      });
       if (data.success) {
         setOrders(data.data);
         if (data.counts) {
@@ -65,7 +77,13 @@ export default function RestaurantOrders() {
 
   const handleStatusChange = (status) => {
     setSelectedStatus(status);
-    fetchOrders(status);
+    fetchOrders(status, selectedDate);
+  };
+
+  const handleDateChange = (event) => {
+    const nextDate = event.target.value;
+    setSelectedDate(nextDate);
+    fetchOrders(selectedStatus, nextDate);
   };
 
   const updateStatus = async (orderId, newStatus) => {
@@ -99,13 +117,22 @@ export default function RestaurantOrders() {
     { key: 'preparing', label: 'Preparing', icon: <SyncOutlined /> },
     { key: 'picked_up', label: 'On the way', icon: <CarOutlined /> },
     { key: 'delivered', label: 'Delivered', icon: <CheckCircleOutlined /> },
+    { key: 'cancelled', label: 'Cancelled', icon: <CloseCircleOutlined /> },
   ];
 
   return (
     <div className="animate-fade-in max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Order Management</h1>
-        <button onClick={() => fetchOrders()} className="btn-secondary px-4 py-2 text-sm"><SyncOutlined /> Refresh</button>
+        <div className="flex items-center gap-3">
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={handleDateChange}
+            className="h-[38px] px-3 rounded-lg border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <button onClick={() => fetchOrders()} className="btn-secondary px-4 py-2 text-sm"><SyncOutlined /> Refresh</button>
+        </div>
       </div>
 
       {/* Status Tabs */}
@@ -147,6 +174,7 @@ export default function RestaurantOrders() {
                 <th className="p-4 font-semibold text-center w-20">#</th>
                 <th className="p-4 font-semibold">Order Details</th>
                 <th className="p-4 font-semibold">Customer</th>
+                <th className="p-4 font-semibold">Delivery</th>
                 <th className="p-4 font-semibold">Amount</th>
                 <th className="p-4 font-semibold">Status</th>
                 <th className="p-4 font-semibold text-right">Actions</th>
@@ -173,7 +201,17 @@ export default function RestaurantOrders() {
                     <div className="text-xs text-gray-500">{order.Customer?.User?.phone_number || 'N/A'}</div>
                   </td>
                   <td className="p-4">
-                    <div className="font-black text-gray-900">{order.total_amount?.toLocaleString()}đ</div>
+                    <div className="font-bold text-gray-800 text-sm">{order.DeliveryPartner?.User?.full_name || 'Unassigned'}</div>
+                    <div className="text-xs text-gray-500">{order.DeliveryPartner?.User?.phone_number || 'N/A'}</div>
+                  </td>
+                  <td className="p-4">
+                    <div className="font-black text-gray-900">
+                      {(
+                        Number.isFinite(Number(order.subtotal))
+                          ? Number(order.subtotal)
+                          : Math.max(Number(order.total_amount || 0) - Number(order.delivery_fee || 0), 0)
+                      ).toLocaleString()}đ
+                    </div>
                     <div className="text-[10px] text-gray-400 uppercase font-bold">{order.payment_method}</div>
                   </td>
                   <td className="p-4">{getStatusBadge(order.status)}</td>
