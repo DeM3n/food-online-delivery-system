@@ -44,18 +44,26 @@ export default function CheckoutPage() {
                 })),
                 delivery_fee: deliveryFee
             };
-
-            const response = await axios.post('/orders', orderData);
-
-            if (response.data.success) {
-                notification.success({
-                    message: 'Order Placed Successfully',
-                    description: 'Your order has been received!',
-                    placement: 'topRight'
+            let response;
+            if(paymentMethod === "vnpay"){
+                response = await axios.post('/payments/create-vnpay', {
+                    restaurantId: restaurantId,
+                    addressId: profile?.Addresses?.[0]?.id,
+                    delivery_fee: 15000,
+                    notes: notes || "No notes provided"
                 });
+            } else if (paymentMethod === "cod"){
+                response = await axios.post('/orders', orderData);
+            }
+            if (response.data.success) {
                 if(paymentMethod === "vnpay"){
-                    window.location.assign(response.data.paymentUrl);
+                    window.location.assign(response.data.data.paymentUrl);
                 } else if (paymentMethod === "cod"){
+                    notification.success({
+                        message: 'Order Placed Successfully',
+                        description: 'Your order has been received!',
+                        placement: 'topRight'
+                    });
                     navigate("/customer/tracking");
                 }
                 dispatch(clearCartAsync());
