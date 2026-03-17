@@ -133,7 +133,7 @@ const OrderTracking = () => {
   }
 
   const activeOrders = orders.filter(o => 
-    o.status !== 'completed' && o.status !== 'cancelled'
+    o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'refunded'
   );
 
   return (

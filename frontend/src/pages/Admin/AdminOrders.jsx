@@ -51,10 +51,20 @@ export default function AdminOrders() {
 
       const response = await axios.get(url);
       if (response.data.success) {
-        setOrders(response.data.data);
+        const filteredOrders = (response.data.data || []).filter(order => order.status !== 'refunded');
+        setOrders(filteredOrders);
+
         if (response.data.counts) {
-          setCounts(response.data.counts);
+          setCounts({
+            pending: response.data.counts.pending || 0,
+            accepted: response.data.counts.accepted || 0,
+            preparing: response.data.counts.preparing || 0,
+            picked_up: response.data.counts.picked_up || 0,
+            delivered: response.data.counts.delivered || 0,
+            cancelled: response.data.counts.cancelled || 0
+          });
         }
+
         if (response.data.pagination) {
           setTotalOrders(response.data.pagination.total || 0);
           setTotalPages(response.data.pagination.totalPages || 1);
@@ -90,14 +100,21 @@ export default function AdminOrders() {
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'pending': return <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><ClockCircleOutlined className="mr-1" /> Pending</span>;
-      case 'accepted': return <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><CheckCircleOutlined className="mr-1" /> Accepted</span>;
-      case 'preparing': return <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><SyncOutlined spin className="mr-1" /> Preparing</span>;
-      case 'picked_up': return <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><CarOutlined className="mr-1" /> On the Way</span>;
+      case 'pending':
+        return <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><ClockCircleOutlined className="mr-1" /> Pending</span>;
+      case 'accepted':
+        return <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><CheckCircleOutlined className="mr-1" /> Accepted</span>;
+      case 'preparing':
+        return <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><SyncOutlined spin className="mr-1" /> Preparing</span>;
+      case 'picked_up':
+        return <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><CarOutlined className="mr-1" /> On the Way</span>;
       case 'delivered':
-      case 'completed': return <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><CheckCircleOutlined className="mr-1" /> Delivered</span>;
-      case 'cancelled': return <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><CloseCircleOutlined className="mr-1" /> Cancelled</span>;
-      default: return <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase">{status}</span>;
+      case 'completed':
+        return <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><CheckCircleOutlined className="mr-1" /> Delivered</span>;
+      case 'cancelled':
+        return <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase"><CloseCircleOutlined className="mr-1" /> Cancelled</span>;
+      default:
+        return <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase">{status}</span>;
     }
   };
 
@@ -108,6 +125,7 @@ export default function AdminOrders() {
           <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Global Order Tracking</h1>
           <p className="text-gray-500 font-medium">Monitor and manage all system transactions</p>
         </div>
+
         <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl shadow-soft border border-gray-100 w-full md:w-auto">
           <FilterOutlined className="text-primary ml-2" />
           <select
@@ -123,21 +141,24 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      {/* Status Tabs */}
       <div className="flex flex-nowrap gap-3.5 items-center mb-7 overflow-x-auto pt-3 pb-5 no-scrollbar px-1">
         {statusTabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setSelectedStatus(tab.key)}
-            className={`flex items-center gap-2.7 px-5 py-3 rounded-2xl font-bold transition-all whitespace-nowrap border-2 ${selectedStatus === tab.key
-              ? `${tab.bg} ${tab.color} border-current shadow-md scale-105 z-10`
-              : 'bg-white text-gray-400 border-gray-50 hover:border-gray-100 hover:text-gray-500 shadow-sm'
-              }`}
+            className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl font-bold transition-all whitespace-nowrap border-2 ${
+              selectedStatus === tab.key
+                ? `${tab.bg} ${tab.color} border-current shadow-md scale-105 z-10`
+                : 'bg-white text-gray-400 border-gray-50 hover:border-gray-100 hover:text-gray-500 shadow-sm'
+            }`}
           >
             <span className="text-lg">{tab.icon}</span>
             <span className="text-[13px] tracking-tight">{tab.label}</span>
-            <span className={`ml-1 text-[11px] px-2 py-0.5 rounded-full font-black ${selectedStatus === tab.key ? 'bg-white shadow-inner' : 'bg-gray-100'
-              }`}>
+            <span
+              className={`ml-1 text-[11px] px-2 py-0.5 rounded-full font-black ${
+                selectedStatus === tab.key ? 'bg-white shadow-inner' : 'bg-gray-100'
+              }`}
+            >
               {counts[tab.key] || 0}
             </span>
           </button>
@@ -173,6 +194,7 @@ export default function AdminOrders() {
                         {new Date(order.created_at).toLocaleDateString()} {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </td>
+
                     <td className="p-8">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 border border-orange-100">
@@ -181,6 +203,7 @@ export default function AdminOrders() {
                         <span className="text-sm font-black text-gray-700 tracking-tight">{order.Restaurant?.name}</span>
                       </div>
                     </td>
+
                     <td className="p-8">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 border border-blue-100">
@@ -189,14 +212,16 @@ export default function AdminOrders() {
                         <span className="text-sm font-bold text-gray-600">{order.Customer?.User?.full_name}</span>
                       </div>
                     </td>
+
                     <td className="p-8">
                       <div className="text-base font-black text-gray-900 tracking-tighter">
-                        {order.total_amount?.toLocaleString()}đ
+                        {Number(order.total_amount || 0).toLocaleString()}đ
                       </div>
                       <div className="text-[9px] text-gray-400 uppercase font-bold tracking-[0.15em] mt-1">
                         Pay via: <span className="text-primary">{order.payment_method}</span>
                       </div>
                     </td>
+
                     <td className="p-8">
                       {getStatusBadge(order.status)}
                     </td>
@@ -211,7 +236,9 @@ export default function AdminOrders() {
               <ClockCircleOutlined className="text-3xl text-gray-200" />
             </div>
             <h3 className="font-black text-gray-800 text-lg mb-2">No {selectedStatus} orders</h3>
-            <p className="text-sm max-w-[250px] mx-auto text-gray-400 font-medium">There are currently no orders with this status for the selected criteria.</p>
+            <p className="text-sm max-w-[250px] mx-auto text-gray-400 font-medium">
+              There are currently no orders with this status for the selected criteria.
+            </p>
           </div>
         )}
 
@@ -221,6 +248,7 @@ export default function AdminOrders() {
               Showing {Math.min((currentPage - 1) * pageSize + 1, totalOrders)}-
               {Math.min(currentPage * pageSize, totalOrders)} of {totalOrders} orders
             </div>
+
             <div className="flex items-center gap-2">
               <select
                 className="h-9 px-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600"
@@ -231,6 +259,7 @@ export default function AdminOrders() {
                   <option key={size} value={size}>{size} / page</option>
                 ))}
               </select>
+
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
@@ -238,9 +267,11 @@ export default function AdminOrders() {
               >
                 Prev
               </button>
+
               <span className="text-xs font-bold text-gray-600 min-w-[70px] text-center">
                 {currentPage} / {totalPages}
               </span>
+
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage >= totalPages}

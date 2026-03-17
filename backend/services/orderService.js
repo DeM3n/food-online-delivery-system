@@ -61,7 +61,8 @@ class OrderService {
             preparing: 0,
             picked_up: 0,
             delivered: 0,
-            cancelled: 0
+            cancelled: 0,
+            refunded: 0
         };
 
         statusCounts.forEach(sc => {
@@ -470,9 +471,12 @@ class OrderService {
         });
     }
 
-    async cancelOrder(orderId, userId, io) {
+    async cancelOrder(orderId, userId, io, req = null) {
         const order = await Order.findByPk(orderId, {
-            include: [{ model: Restaurant }, { model: Customer }]
+            include: [
+                { model: Restaurant },
+                { model: Customer, include: [{ model: User, attributes: ['email', 'full_name'] }] }
+            ]
         });
 
         if (!order) throw new Error('Order not found');
@@ -487,15 +491,61 @@ class OrderService {
             throw new Error(`Cannot cancel order in ${order.status} status.`);
         }
 
-        order.status = 'cancelled';
+        let refund = {
+            refunded: false,
+            refundStatus: 'none',
+            refundAmount: 0,
+            refundMessage: 'No refund required',
+        };
+
+        try {
+            refund = await paymentService.refundOrderPayment({
+                order,
+                ipAddr: req ? paymentService.getClientIp(req) : '127.0.0.1',
+                createBy: 'customer_cancel',
+            });
+        } catch (refundError) {
+            console.error('Refund processing failed:', refundError);
+            refund = {
+                refunded: false,
+                refundStatus: 'failed',
+                refundAmount: 0,
+                refundMessage: refundError.message || 'Refund request failed',
+            };
+        }
+
+        // Chỉ đổi sang refunded khi refund thành công thật
+        if (refund.refundResponseCode === '99') {
+            order.status = 'refunded';
+            order.payment_status = 'refunded';
+        } else {
+            order.status = 'cancelled';
+        }
+
         await order.save();
 
         if (io) {
-            if (order.Customer) io.to(order.Customer.user_id).emit('ORDER_STATUS_UPDATED', { orderId: order.id, status: 'cancelled' });
-            if (order.Restaurant) io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', { orderId: order.id, status: 'cancelled' });
+            if (order.Customer) {
+                io.to(order.Customer.user_id).emit('ORDER_STATUS_UPDATED', {
+                    orderId: order.id,
+                    status: order.status,
+                    refund,
+                });
+            }
+
+            if (order.Restaurant) {
+                io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', {
+                    orderId: order.id,
+                    status: order.status,
+                    refund,
+                });
+            }
         }
 
-        return order;
+        return {
+            order,
+            refund,
+        };
     }
 
     async getRestaurantYearlySummary(userId, year) {

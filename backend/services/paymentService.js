@@ -9,13 +9,185 @@ const {
   Cart,
   CartItem,
   MenuItem,
+  User,
 } = require('../models');
 const PaymentGatewayFactory = require('../factories/paymentGatewayFactory');
+const { sendRefundEmail } = require('./mailService');
 
 const FRONTEND_RETURN_URL =
   process.env.FRONTEND_VNPAY_RETURN_URL || 'http://localhost:5173/payment-result';
 
 class PaymentService {
+
+  async refundOrderPayment({ order, ipAddr, createBy = 'system' }) {
+    const payment = await Payment.findOne({ where: { order_id: order.id } });
+
+    if (!payment) {
+      return {
+        refunded: false,
+        refundStatus: 'none',
+        message: 'No payment record found'
+      };
+    }
+
+    if (payment.payment_method !== 'vnpay' && payment.payment_method !== 'online') {
+      return {
+        refunded: false,
+        refundStatus: 'none',
+        message: 'COD order does not require refund'
+      };
+    }
+
+    if (payment.status !== 'paid') {
+      return {
+        refunded: false,
+        refundStatus: payment.refund_status || 'none',
+        message: 'Payment is not in paid status'
+      };
+    }
+
+    if (payment.refund_status === 'refunded') {
+      return {
+        refunded: true,
+        refundStatus: 'refunded',
+        refundAmount: Number(payment.refund_amount || payment.amount || 0),
+        refundResponseCode: payment.refund_response_code || '00',
+        refundMessage: payment.refund_message || 'Payment already refunded'
+      };
+    }
+
+    const gateway = PaymentGatewayFactory.create(payment.payment_gateway || 'vnpay');
+
+    const queriedTx = await gateway.queryTransaction({
+      payment,
+      ipAddr,
+    });
+
+    if (!queriedTx.ok) {
+      payment.refund_status = 'failed';
+      payment.refund_response_code = queriedTx.responseCode;
+      payment.refund_message = queriedTx.message || 'Failed to query original transaction';
+      await payment.save();
+
+      return {
+        refunded: false,
+        refundStatus: 'failed',
+        refundAmount: 0,
+        refundResponseCode: queriedTx.responseCode,
+        refundMessage: queriedTx.message,
+      };
+    }
+
+    if (queriedTx.transactionStatus && queriedTx.transactionStatus !== '00') {
+      payment.refund_status = 'failed';
+      payment.refund_response_code = queriedTx.transactionStatus;
+      payment.refund_message = `Original transaction is not refundable. Status: ${queriedTx.transactionStatus}`;
+      await payment.save();
+
+      return {
+        refunded: false,
+        refundStatus: 'failed',
+        refundAmount: 0,
+        refundResponseCode: queriedTx.transactionStatus,
+        refundMessage: payment.refund_message,
+      };
+    }
+
+    payment.refund_status = 'pending';
+    payment.refund_requested_at = new Date();
+    payment.refund_amount = Number(queriedTx.amount || payment.amount || 0);
+    await payment.save();
+
+    const refundResult = await gateway.refund({
+      payment,
+      order,
+      amount: Number(queriedTx.amount || payment.amount || 0),
+      ipAddr,
+      createBy,
+    });
+
+    payment.refund_response_code = refundResult.responseCode;
+    payment.refund_message = refundResult.message;
+    payment.refund_transaction_id = refundResult.refundTransactionId;
+
+    const hydratedOrder = await Order.findByPk(order.id, {
+      include: [
+        {
+          model: Customer,
+          include: [{ model: User, attributes: ['email', 'full_name'] }]
+        }
+      ],
+    });
+
+    const customerEmail = hydratedOrder?.Customer?.User?.email;
+    const customerName = hydratedOrder?.Customer?.User?.full_name;
+
+    if (refundResult.ok) {
+      payment.refund_status = 'refunded';
+      payment.refunded_at = new Date();
+      payment.status = 'refunded';
+      await payment.save();
+
+      await Notification.create({
+        user_id: order.customer_id,
+        type: 'payment',
+        title: 'Hoàn tiền thành công',
+        message: `Đơn hàng ${order.id} đã được hoàn tiền thành công.`,
+      });
+
+      if (customerEmail) {
+        try {
+          await sendRefundEmail({
+            to: customerEmail,
+            customerName,
+            orderId: order.id,
+            refundAmount: payment.refund_amount,
+            gatewayName: gateway.getGatewayName().toUpperCase(),
+            status: 'success',
+            refundMessage: refundResult.message,
+          });
+        } catch (mailError) {
+          console.error('Send refund success email failed:', mailError);
+        }
+      }
+
+      return {
+        refunded: true,
+        refundStatus: 'refunded',
+        refundAmount: Number(payment.refund_amount || 0),
+        refundResponseCode: refundResult.responseCode,
+        refundMessage: refundResult.message,
+      };
+    }
+
+    payment.refund_status = 'failed';
+    await payment.save();
+
+    if (customerEmail) {
+      try {
+        await sendRefundEmail({
+          to: customerEmail,
+          customerName,
+          orderId: order.id,
+          refundAmount: payment.refund_amount,
+          gatewayName: gateway.getGatewayName().toUpperCase(),
+          status: 'failed',
+          refundMessage: refundResult.message,
+        });
+      } catch (mailError) {
+        console.error('Send refund failed email failed:', mailError);
+      }
+    }
+
+    return {
+      refunded: false,
+      refundStatus: 'failed',
+      refundAmount: Number(payment.refund_amount || 0),
+      refundResponseCode: refundResult.responseCode,
+      refundMessage: refundResult.message,
+    };
+  }
+
   getClientIp(req) {
     const forwarded = req.headers['x-forwarded-for'];
     if (forwarded) return forwarded.split(',')[0].trim();
@@ -33,6 +205,12 @@ class PaymentService {
     return `OD${Date.now()}${compact}`.slice(0, 40);
   }
 
+  formatVnpDate(date) {
+    const d = new Date(date);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  }
+
   async createCheckoutSession({
     userId,
     restaurantId,
@@ -43,6 +221,7 @@ class PaymentService {
     ipAddr,
   }) {
     const customer = await Customer.findOne({ where: { user_id: userId } });
+    const createDate = this.formatVnpDate(new Date());
     if (!customer) throw new Error('Customer not found');
 
     const address = await Address.findOne({
@@ -104,6 +283,7 @@ class PaymentService {
       customer_id: customer.id,
       restaurant_id: restaurantId,
       delivery_address_id: addressId,
+      gateway_create_date: createDate,
       notes: notes || null,
       items_json: JSON.stringify(items),
       delivery_fee: normalizedDeliveryFee,
@@ -122,6 +302,7 @@ class PaymentService {
       returnUrl: process.env.VNP_RETURN_URL || 'http://localhost:5001/api/payments/vnpay/return',
       ipAddr,
       locale: process.env.VNP_LOCALE || 'vn',
+      createDate,
     });
 
     return {
