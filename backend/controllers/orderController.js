@@ -1,4 +1,5 @@
 const orderService = require('../services/orderService');
+const paymentService = require('../services/paymentService');
 
 // @desc    Get restaurant orders
 // @route   GET /api/orders/restaurant/me
@@ -179,8 +180,16 @@ exports.getRestaurantYearlySummary = async (req, res) => {
 // @access  Private
 exports.cancelOrder = async (req, res) => {
     try {
-        const order = await orderService.cancelOrder(req.params.id, req.user.id, req.io);
-        res.json({ success: true, message: 'Order cancelled successfully', data: order });
+        const result = await orderService.cancelOrder(req.params.id, req.user.id, req.io, req);
+
+        res.json({
+          success: true,
+          message: result.refund?.refunded
+            ? 'Order refunded successfully'
+            : 'Order cancelled successfully',
+          data: result.order,
+          refund: result.refund,
+        });
     } catch (error) {
         console.error(error);
         const statusCode = (error.message.includes('not found')) ? 404 : 

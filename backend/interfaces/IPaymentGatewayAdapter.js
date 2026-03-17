@@ -18,6 +18,14 @@ class IPaymentGatewayAdapter {
   normalizeResult(_query, _verificationResult) {
     throw new Error('normalizeResult() must be implemented');
   }
+
+  async queryTransaction(_payload) {
+    throw new Error('queryTransaction() must be implemented');
+  }
+
+  async refund(_payload) {
+    throw new Error('refund() must be implemented');
+  }
 }
 
 module.exports = IPaymentGatewayAdapter;
