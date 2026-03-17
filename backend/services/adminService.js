@@ -100,7 +100,8 @@ class AdminService {
             preparing: 0,
             picked_up: 0,
             delivered: 0,
-            cancelled: 0
+            cancelled: 0,
+            refunded: 0
         };
 
         statusCounts.forEach(sc => {

@@ -137,6 +137,105 @@ const sendDeliveredOrderEmail = async ({ to, customerName, orderId, restaurantNa
   });
 };
 
+const sendRefundEmail = async ({
+  to,
+  customerName,
+  orderId,
+  refundAmount,
+  gatewayName = 'VNPay',
+  status = 'success',
+  refundMessage,
+}) => {
+  const isSuccess = status === 'success';
+  const subject = isSuccess
+    ? `Hoàn tiền đơn hàng ${orderId} thành công`
+    : `Cập nhật hoàn tiền đơn hàng ${orderId}`;
+
+  const amountText = new Intl.NumberFormat('vi-VN').format(Number(refundAmount / 100 || 0));
+
+  const html = `
+    <div style="margin:0; padding:0; background-color:#f9fafb; font-family:Arial,Helvetica,sans-serif; color:#1f2937;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f9fafb; margin:0; padding:24px 0;">
+        <tr>
+          <td align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:640px; background-color:#ffffff; border:1px solid #f3f4f6; border-radius:24px; overflow:hidden;">
+              <tr>
+                <td style="padding:32px 32px 24px 32px; background:linear-gradient(135deg,#eff6ff 0%,#ffffff 100%); border-bottom:1px solid #f3f4f6;">
+                  <div style="display:inline-block; padding:10px 16px; background-color:${isSuccess ? '#2563eb' : '#f59e0b'}; color:#ffffff; font-size:13px; font-weight:700; border-radius:999px; letter-spacing:0.3px;">
+                    OFDS • REFUND UPDATE
+                  </div>
+                  <h1 style="margin:18px 0 8px 0; font-size:28px; line-height:1.25; font-weight:800; color:#111827;">
+                    ${isSuccess ? 'Hoàn tiền thành công' : 'Cập nhật trạng thái hoàn tiền'}
+                  </h1>
+                  <p style="margin:0; font-size:15px; line-height:1.7; color:#6b7280;">
+                    Xin chào <strong style="color:#111827;">${customerName || 'bạn'}</strong>,
+                    ${isSuccess ? 'yêu cầu hoàn tiền của bạn đã được xử lý thành công.' : 'yêu cầu hoàn tiền của bạn đã được ghi nhận.'}
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:24px 32px 8px 32px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #f3f4f6; border-radius:20px; background-color:#ffffff;">
+                    <tr>
+                      <td style="padding:24px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                          <tr>
+                            <td style="padding:10px 0; font-size:14px; color:#6b7280;">Mã đơn hàng</td>
+                            <td align="right" style="padding:10px 0; font-size:14px; font-weight:700; color:#111827;">${orderId}</td>
+                          </tr>
+                          <tr>
+                            <td style="padding:10px 0; font-size:14px; color:#6b7280; border-top:1px solid #f9fafb;">Số tiền hoàn</td>
+                            <td align="right" style="padding:10px 0; font-size:14px; font-weight:700; color:#111827; border-top:1px solid #f9fafb;">${amountText} đ</td>
+                          </tr>
+                          <tr>
+                            <td style="padding:10px 0; font-size:14px; color:#6b7280; border-top:1px solid #f9fafb;">Cổng thanh toán</td>
+                            <td align="right" style="padding:10px 0; font-size:14px; font-weight:700; color:#111827; border-top:1px solid #f9fafb;">${gatewayName}</td>
+                          </tr>
+                          <tr>
+                            <td style="padding:10px 0; font-size:14px; color:#6b7280; border-top:1px solid #f9fafb;">Trạng thái</td>
+                            <td align="right" style="padding:10px 0; border-top:1px solid #f9fafb;">
+                              <span style="display:inline-block; padding:7px 12px; background-color:${isSuccess ? '#eff6ff' : '#fffbeb'}; color:${isSuccess ? '#1d4ed8' : '#b45309'}; font-size:12px; font-weight:800; border-radius:999px; text-transform:uppercase; letter-spacing:0.4px;">
+                                ${isSuccess ? 'Refunded' : 'Pending/Failed'}
+                              </span>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              ${refundMessage ? `
+              <tr>
+                <td style="padding:16px 32px 8px 32px;">
+                  <div style="padding:20px 22px; background-color:#eff6ff; border:1px solid #bfdbfe; border-radius:18px;">
+                    <div style="font-size:14px; line-height:1.7; color:#1e3a8a;">${refundMessage}</div>
+                  </div>
+                </td>
+              </tr>` : ''}
+              <tr>
+                <td align="center" style="padding:28px 32px 16px 32px;">
+                  <a href="${process.env.FRONTEND_BASE_URL || 'http://localhost:5173'}/customer/tracking"
+                     style="display:inline-block; background-color:#2563eb; color:#ffffff; text-decoration:none; font-size:15px; font-weight:800; padding:14px 28px; border-radius:14px;">
+                    Xem đơn hàng của tôi
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>`;
+
+  return transporter.sendMail({
+    from: process.env.MAIL_FROM || process.env.MAIL_USER,
+    to,
+    subject,
+    html,
+  });
+};
+
 module.exports = {
   sendDeliveredOrderEmail,
+  sendRefundEmail,
 };
