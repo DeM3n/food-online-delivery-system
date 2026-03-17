@@ -561,14 +561,16 @@ class OrderService {
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value);
 
-        // Recent 10 orders across all statuses
+        // All recent orders across all statuses for the selected year
         const recentOrders = await Order.findAll({
-            where: { restaurant_id: restaurant.id },
+            where: {
+                restaurant_id: restaurant.id,
+                created_at: { [Op.between]: [startOfYear, endOfYear] }
+            },
             include: [
                 { model: Customer, include: [{ model: User, attributes: ['full_name'] }] }
             ],
-            order: [['created_at', 'DESC']],
-            limit: 10
+            order: [['created_at', 'DESC']]
         });
 
         return {

@@ -53,7 +53,11 @@ export default function RestaurantSummary() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [orderPage, setOrderPage] = useState(1);
+  const [monthFilter, setMonthFilter] = useState('all');
+  const ORDER_PAGE_SIZE = 10;
   const yearOptions = buildYearOptions();
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   useEffect(() => {
     if (profile?.id) fetchSummary();
@@ -62,6 +66,8 @@ export default function RestaurantSummary() {
   const fetchSummary = async () => {
     try {
       setLoading(true);
+      setOrderPage(1);
+      setMonthFilter('all'); // reset month filter on year change
       const { data: res } = await axios.get('/orders/restaurant/me/yearly-summary', {
         params: { year }
       });
@@ -260,7 +266,32 @@ export default function RestaurantSummary() {
 
           {/* Row 3: Recent Orders Table */}
           <div className="bg-white p-6 rounded-2xl shadow-soft">
-            <h2 className="text-lg font-bold text-gray-800 mb-5">Recent Orders</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+              <h2 className="text-lg font-bold text-gray-800">Recent Orders</h2>
+              <div className="flex items-center gap-3">
+                {/* Month filter */}
+                <select
+                  value={monthFilter}
+                  onChange={e => { setMonthFilter(e.target.value); setOrderPage(1); }}
+                  className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="all">All months</option>
+                  {MONTHS.map((m, i) => (
+                    <option key={i} value={i}>{m}</option>
+                  ))}
+                </select>
+                {data.recentOrders.length > 0 && (
+                  <span className="text-xs text-gray-400">
+                    {(() => {
+                      const filtered = monthFilter === 'all'
+                        ? data.recentOrders
+                        : data.recentOrders.filter(o => new Date(o.createdAt).getMonth() === Number(monthFilter));
+                      return `${filtered.length} orders`;
+                    })()}
+                  </span>
+                )}
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -273,50 +304,73 @@ export default function RestaurantSummary() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.recentOrders.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-10 text-center text-gray-300 text-sm">
-                        No orders yet
-                      </td>
-                    </tr>
-                  ) : (
-                    data.recentOrders.map(order => {
+                  {(() => {
+                    const filtered = monthFilter === 'all'
+                      ? data.recentOrders
+                      : data.recentOrders.filter(o => new Date(o.createdAt).getMonth() === Number(monthFilter));
+                    const paginated = filtered.slice((orderPage - 1) * ORDER_PAGE_SIZE, orderPage * ORDER_PAGE_SIZE);
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={5} className="py-10 text-center text-gray-300 text-sm">
+                            No orders found
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return paginated.map(order => {
                       const s = STATUS_STYLES[order.status] || { bg: 'bg-gray-100', text: 'text-gray-600' };
                       return (
-                        <tr
-                          key={order.id}
-                          className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
-                        >
-                          <td className="py-3.5 pr-4 font-mono text-xs text-gray-400">
-                            #{order.id.slice(0, 8)}
-                          </td>
-                          <td className="py-3.5 pr-4 font-semibold text-gray-700 text-sm">
-                            {order.customerName}
-                          </td>
-                          <td className="py-3.5 pr-4 font-bold text-gray-800 text-sm tabular-nums">
-                            {Number(order.subtotal).toLocaleString()}đ
-                          </td>
+                        <tr key={order.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                          <td className="py-3.5 pr-4 font-mono text-xs text-gray-400">#{order.id.slice(0, 8)}</td>
+                          <td className="py-3.5 pr-4 font-semibold text-gray-700 text-sm">{order.customerName}</td>
+                          <td className="py-3.5 pr-4 font-bold text-gray-800 text-sm tabular-nums">{Number(order.subtotal).toLocaleString()}đ</td>
                           <td className="py-3.5 pr-4 text-gray-500 text-sm">
-                            {new Date(order.createdAt).toLocaleDateString('en-GB', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                            })}
+                            {new Date(order.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </td>
                           <td className="py-3.5">
-                            <span
-                              className={`${s.bg} ${s.text} px-2.5 py-1 rounded-full text-xs font-bold capitalize`}
-                            >
+                            <span className={`${s.bg} ${s.text} px-2.5 py-1 rounded-full text-xs font-bold capitalize`}>
                               {order.status.replace('_', ' ')}
                             </span>
                           </td>
                         </tr>
                       );
-                    })
-                  )}
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            {(() => {
+              const filtered = monthFilter === 'all'
+                ? data.recentOrders
+                : data.recentOrders.filter(o => new Date(o.createdAt).getMonth() === Number(monthFilter));
+              const totalPages = Math.ceil(filtered.length / ORDER_PAGE_SIZE);
+              if (filtered.length <= ORDER_PAGE_SIZE) return null;
+              return (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                  <button
+                    onClick={() => setOrderPage(p => Math.max(1, p - 1))}
+                    disabled={orderPage === 1}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-orange-100 text-gray-600 hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ← Previous
+                  </button>
+                  <span className="text-sm text-gray-500">
+                    Page <span className="font-bold text-gray-700">{orderPage}</span> of{' '}
+                    <span className="font-bold text-gray-700">{totalPages}</span>
+                  </span>
+                  <button
+                    onClick={() => setOrderPage(p => Math.min(totalPages, p + 1))}
+                    disabled={orderPage === totalPages}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-100 hover:bg-orange-100 text-gray-600 hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next →
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </>
       )}

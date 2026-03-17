@@ -63,21 +63,26 @@ export default function RestaurantDashboard() {
     }
   }, [profile, user]);
 
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const ordersThisMonth = orders.filter(o => {
+    const d = new Date(o.createdAt);
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  });
+
+  const completedThisMonth = ordersThisMonth.filter(
+    o => o.status === 'completed' || o.status === 'delivered'
+  ).length;
+
+  const cancelledThisMonth = ordersThisMonth.filter(
+    o => o.status === 'cancelled'
+  ).length;
+
   const stats = [
-    { label: "Total Orders", value: orders.length, color: "border-primary" },
-    {
-      label: "Revenue",
-      value: `${orders.reduce((acc, o) => {
-        const subtotal = Number(o.subtotal);
-        const total = Number(o.total_amount || 0);
-        const deliveryFee = Number(o.delivery_fee || 0);
-        const restaurantAmount = Number.isFinite(subtotal)
-          ? subtotal
-          : Math.max(total - deliveryFee, 0);
-        return acc + restaurantAmount;
-      }, 0).toLocaleString()}đ`,
-      color: "border-secondary"
-    },
+    { label: "Completed Orders (this month)", value: completedThisMonth, color: "border-primary" },
+    { label: "Cancelled Orders (this month)", value: cancelledThisMonth, color: "border-secondary" },
     { label: "Restaurant Rating", value: `${profile?.rating || 'N/A'} ⭐`, color: "border-accent" },
   ];
 
