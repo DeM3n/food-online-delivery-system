@@ -2,6 +2,49 @@ const { User, Restaurant, Customer, DeliveryPartner, Order, sequelize } = requir
 const { Op } = require('sequelize');
 
 class AdminService {
+    mapPendingApprovalItem(user) {
+        const isRestaurant = user.role === 'restaurant';
+        const profile = isRestaurant ? user.Restaurant : user.DeliveryPartner;
+        const displayName = isRestaurant
+            ? (user.Restaurant?.name || user.full_name || 'Unnamed Restaurant')
+            : (user.full_name || 'Unnamed Driver');
+
+        return {
+            id: user.id,
+            type: isRestaurant ? 'restaurant' : 'driver',
+            name: displayName,
+            email: user.email,
+            phone: user.phone_number,
+            status: 'PENDING',
+            created_at: user.created_at,
+            avatarUrl: null,
+            details: {
+                user: {
+                    full_name: user.full_name,
+                    email: user.email,
+                    phone_number: user.phone_number
+                },
+                driver: !isRestaurant ? {
+                    id_cccd: null,
+                    driver_license: user.DeliveryPartner?.vehicle_license || null,
+                    vehicle_info: user.DeliveryPartner?.vehicle_license || null,
+                    uploaded_documents: []
+                } : null,
+                restaurant: isRestaurant ? {
+                    restaurant_name: user.Restaurant?.name || null,
+                    owner_name: user.full_name,
+                    email: user.email,
+                    phone: user.phone_number,
+                    address: user.Restaurant?.location || null,
+                    business_license: null,
+                    images: [],
+                    menu: []
+                } : null,
+                profile
+            }
+        };
+    }
+
     async getSystemStats() {
         const [userCount, restaurantCount, driverCount, orderStats] = await Promise.all([
             User.count(),
@@ -121,6 +164,117 @@ class AdminService {
                 totalPages: Math.max(Math.ceil(total / parsedLimit), 1)
             }
         };
+    }
+
+    async getPendingApprovals({ type = 'all', search = '', sort = 'newest', page = 1, limit = 9 }) {
+        const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+        const parsedLimit = Math.max(parseInt(limit, 10) || 9, 1);
+
+        const where = {
+            role: { [Op.in]: ['restaurant', 'delivery_partner'] },
+            is_active: false
+        };
+
+        if (search) {
+            where[Op.or] = [
+                { email: { [Op.like]: `%${search}%` } },
+                { full_name: { [Op.like]: `%${search}%` } }
+            ];
+        }
+
+        const users = await User.findAll({
+            where,
+            attributes: ['id', 'email', 'full_name', 'phone_number', 'role', 'created_at'],
+            include: [
+                { model: Restaurant, attributes: ['id', 'name', 'location', 'cuisine_type', 'opening_hours', 'is_open', 'rating', 'delivery_radius'] },
+                { model: DeliveryPartner, attributes: ['id', 'vehicle_license', 'is_available', 'rating'] }
+            ],
+            order: [['created_at', sort === 'oldest' ? 'ASC' : 'DESC']]
+        });
+
+        let items = users.map((user) => this.mapPendingApprovalItem(user));
+
+        if (type === 'driver' || type === 'restaurant') {
+            items = items.filter((item) => item.type === type);
+        }
+
+        if (search) {
+            const searchLower = search.toLowerCase();
+            items = items.filter((item) =>
+                item.name?.toLowerCase().includes(searchLower) ||
+                item.email?.toLowerCase().includes(searchLower)
+            );
+        }
+
+        const total = items.length;
+        const offset = (parsedPage - 1) * parsedLimit;
+        const paginatedItems = items.slice(offset, offset + parsedLimit);
+
+        return {
+            items: paginatedItems,
+            pagination: {
+                total,
+                page: parsedPage,
+                limit: parsedLimit,
+                totalPages: Math.max(Math.ceil(total / parsedLimit), 1)
+            }
+        };
+    }
+
+    async getPendingApprovalById(userId) {
+        const user = await User.findOne({
+            where: {
+                id: userId,
+                role: { [Op.in]: ['restaurant', 'delivery_partner'] },
+                is_active: false
+            },
+            attributes: ['id', 'email', 'full_name', 'phone_number', 'role', 'created_at'],
+            include: [
+                { model: Restaurant, attributes: ['id', 'name', 'location', 'cuisine_type', 'opening_hours', 'is_open', 'rating', 'delivery_radius'] },
+                { model: DeliveryPartner, attributes: ['id', 'vehicle_license', 'is_available', 'rating'] }
+            ]
+        });
+
+        if (!user) {
+            throw new Error('Pending approval request not found');
+        }
+
+        return this.mapPendingApprovalItem(user);
+    }
+
+    async approvePendingRequest(userId) {
+        const user = await User.findOne({
+            where: {
+                id: userId,
+                role: { [Op.in]: ['restaurant', 'delivery_partner'] }
+            }
+        });
+
+        if (!user) {
+            throw new Error('Approval request not found');
+        }
+
+        user.is_active = true;
+        await user.save();
+
+        return { id: user.id, status: 'APPROVED' };
+    }
+
+    async rejectPendingRequest(userId, reason = '') {
+        const user = await User.findOne({
+            where: {
+                id: userId,
+                role: { [Op.in]: ['restaurant', 'delivery_partner'] }
+            }
+        });
+
+        if (!user) {
+            throw new Error('Approval request not found');
+        }
+
+        await user.destroy();
+
+        return { id: user.id, status: 'REJECTED', reason: reason || null };
     }
 }
 

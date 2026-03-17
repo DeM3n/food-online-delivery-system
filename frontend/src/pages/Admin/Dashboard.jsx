@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from '../../api/axios';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { UserOutlined, ShopOutlined, TeamOutlined, DollarOutlined, ArrowRightOutlined, HistoryOutlined } from '@ant-design/icons';
+import { UserOutlined, ShopOutlined, TeamOutlined, DollarOutlined, ArrowRightOutlined, HistoryOutlined, AuditOutlined } from '@ant-design/icons';
 
 export default function AdminDashboard() {
   const { token } = useSelector(state => state.auth);
@@ -47,6 +47,13 @@ export default function AdminDashboard() {
       link: "/admin/orders",
       gradient: "from-orange-500 to-red-600" 
     },
+    {
+      title: "Pending Approvals",
+      desc: "Review and process driver and restaurant registration requests",
+      icon: <AuditOutlined />,
+      link: "/admin/pending-approvals",
+      gradient: "from-emerald-500 to-teal-600"
+    },
   ];
 
   if (loading) return (
@@ -88,7 +95,7 @@ export default function AdminDashboard() {
       </div>
 
       <h2 className="text-xl font-bold text-gray-800 mb-6">Quick Management</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 mb-12">
         {adminActions.map((action, i) => (
           <Link to={action.link} key={i} className={`group bg-gradient-to-br ${action.gradient} p-8 rounded-[2.5rem] shadow-lg relative overflow-hidden transition-all hover:scale-[1.02] active:scale-95`}>
             <div className="relative z-10 text-white">

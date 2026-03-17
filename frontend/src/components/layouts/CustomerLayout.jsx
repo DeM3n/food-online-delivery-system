@@ -1,6 +1,8 @@
-import React from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
+import axios from '../../api/axios';
+import socket from '../../socket';
 import { logout } from '../../redux/slices/authSlice';
 import { resetCartState } from '../../redux/slices/cartSlice';
 import { Badge } from 'antd';
@@ -9,10 +11,45 @@ import { UserOutlined, ShoppingCartOutlined, HomeOutlined, ShopOutlined, ClockCi
 export default function CustomerLayout() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const location = useLocation();
+  const { user, token } = useSelector((state) => state.auth);
   const { items } = useSelector((state) => state.cart);
+  const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 
   const cartItemsCount = items.reduce((total, item) => total + item.quantity, 0);
+
+  useEffect(() => {
+    const fetchActiveOrdersCount = async () => {
+      if (!token) {
+        setActiveOrdersCount(0);
+        return;
+      }
+
+      try {
+        const response = await axios.get('/orders/me');
+        if (response.data.success) {
+          const activeOrders = (response.data.data || []).filter(
+            (order) => order.status !== 'completed' && order.status !== 'cancelled'
+          );
+          setActiveOrdersCount(activeOrders.length);
+        }
+      } catch (error) {
+        console.error('Failed to fetch active orders count:', error);
+      }
+    };
+
+    fetchActiveOrdersCount();
+
+    const handleOrderUpdated = () => {
+      fetchActiveOrdersCount();
+    };
+
+    socket.on('ORDER_STATUS_UPDATED', handleOrderUpdated);
+
+    return () => {
+      socket.off('ORDER_STATUS_UPDATED', handleOrderUpdated);
+    };
+  }, [token, location.pathname]);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -42,7 +79,9 @@ export default function CustomerLayout() {
             <span>Restaurants</span>
           </Link>
           <Link to="/customer/tracking" className="hover:text-primary transition-colors flex items-center gap-1">
-            <ClockCircleOutlined className="text-xl" />
+            <Badge count={activeOrdersCount} offset={[5, 0]} size="small" color="#FF6B35">
+              <ClockCircleOutlined className="text-xl" />
+            </Badge>
             <span>Order Tracking</span>
           </Link>
           <Link to="/customer/profile" className="hover:text-primary transition-colors flex items-center gap-1">

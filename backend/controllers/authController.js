@@ -46,7 +46,9 @@ exports.loginUser = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    const statusCode = error.message === 'Invalid email or password' ? 401 : 500;
+    const statusCode =
+      error.message === 'Invalid email or password' ? 401 :
+      error.message.includes('pending admin approval') ? 403 : 500;
     res.status(statusCode).json({ success: false, message: error.message });
   }
 };

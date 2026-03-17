@@ -17,13 +17,15 @@ class AuthService {
             throw new Error('User already exists');
         }
 
+        const requiresApproval = role === 'restaurant' || role === 'delivery_partner';
+
         const user = await User.create({
             email,
             password_hash: password,
             role,
             full_name,
             phone_number,
-            is_active: true
+            is_active: !requiresApproval
         });
 
         let profile = null;
@@ -66,6 +68,9 @@ class AuthService {
 
         if (user && (await user.matchPassword(password))) {
             if (!user.is_active) {
+                if (user.role === 'restaurant' || user.role === 'delivery_partner') {
+                    throw new Error('Account is pending admin approval. Please wait for confirmation.');
+                }
                 throw new Error('Account has been deactivated. Please contact support.');
             }
 

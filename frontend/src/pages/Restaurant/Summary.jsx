@@ -5,7 +5,7 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-import { DollarOutlined, ShoppingOutlined, BarChartOutlined, SyncOutlined } from '@ant-design/icons';
+import { DollarOutlined, ShoppingOutlined, BarChartOutlined, SyncOutlined, DownloadOutlined } from '@ant-design/icons';
 
 const PIE_COLORS = ['#FF6B35', '#22c55e', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'];
 
@@ -105,6 +105,60 @@ export default function RestaurantSummary() {
       ]
     : [];
 
+  const exportCSV = () => {
+    if (!data) return;
+
+    const esc = v => `"${String(v).replace(/"/g, '""')}"`;
+    const row = cols => cols.map(esc).join(',');
+    const lines = [];
+
+    // --- Section 1: Summary Stats ---
+    lines.push(row(['YEARLY SUMMARY', year]));
+    lines.push(row(['Restaurant', profile?.name || '']));
+    lines.push(row([]));
+    lines.push(row(['Metric', 'Value']));
+    lines.push(row(['Total Revenue (VND)', data.stats.totalRevenue]));
+    lines.push(row(['Total Orders', data.stats.totalOrders]));
+    lines.push(row(['Avg Order Value (VND)', Math.round(data.stats.avgOrderValue)]));
+    lines.push(row([]));
+
+    // --- Section 2: Monthly Revenue ---
+    lines.push(row(['MONTHLY REVENUE']));
+    lines.push(row(['Month', 'Revenue (VND)', 'Orders']));
+    data.monthlyRevenue.forEach(m => lines.push(row([m.month, m.revenue])));
+    lines.push(row([]));
+
+    // --- Section 3: Top Dishes ---
+    lines.push(row(['TOP DISHES']));
+    lines.push(row(['Dish Name', 'Quantity Sold']));
+    data.topDishes.forEach(d => lines.push(row([d.name, d.quantity])));
+    lines.push(row([]));
+
+    // --- Section 4: Orders (apply current month filter) ---
+    const filteredOrders = monthFilter === 'all'
+      ? data.recentOrders
+      : data.recentOrders.filter(o => new Date(o.createdAt).getMonth() === Number(monthFilter));
+    const monthLabel = monthFilter === 'all' ? 'All Months' : MONTHS[Number(monthFilter)];
+    lines.push(row([`ORDERS (${monthLabel})`]));
+    lines.push(row(['Order ID', 'Customer', 'Subtotal (VND)', 'Date', 'Status']));
+    filteredOrders.forEach(o => lines.push(row([
+      o.id,
+      o.customerName,
+      o.subtotal,
+      new Date(o.createdAt).toLocaleDateString('en-GB'),
+      o.status
+    ])));
+
+    const csvContent = '\uFEFF' + lines.join('\n'); // BOM for Excel UTF-8
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `report_${profile?.name || 'restaurant'}_${year}${monthFilter !== 'all' ? '_' + MONTHS[Number(monthFilter)] : ''}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="animate-fade-in">
       {/* Header */}
@@ -130,6 +184,16 @@ export default function RestaurantSummary() {
           >
             <SyncOutlined spin={loading} />
           </button>
+          {data && (
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-orange-600 transition-colors shadow-sm"
+              title="Export report as CSV"
+            >
+              <DownloadOutlined />
+              Export CSV
+            </button>
+          )}
         </div>
       </div>
 

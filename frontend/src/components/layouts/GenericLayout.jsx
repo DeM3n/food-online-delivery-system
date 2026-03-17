@@ -12,7 +12,8 @@ import {
   UnorderedListOutlined,
   LogoutOutlined,
   ArrowRightOutlined,
-  BarChartOutlined
+  BarChartOutlined,
+  AuditOutlined
 } from '@ant-design/icons';
 
 export default function GenericLayout({ roleTitle, rolePath }) {
@@ -45,6 +46,7 @@ export default function GenericLayout({ roleTitle, rolePath }) {
             {roleTitle === 'Restaurant' && <NavItem to={`${rolePath}/menu`} icon={<UnorderedListOutlined />} label="Menu Catalog" />}
             {roleTitle === 'Restaurant' && <NavItem to={`${rolePath}/summary`} icon={<BarChartOutlined />} label="Yearly Summary" />}
             {rolePath.includes('admin') && <NavItem to={`${rolePath}/users`} icon={<TeamOutlined />} label="User Management" />}
+            {rolePath.includes('admin') && <NavItem to={`${rolePath}/pending-approvals`} icon={<AuditOutlined />} label="Pending Approvals" />}
             <NavItem to={`${rolePath}/profile`} icon={<UserOutlined />} label="Profile" />
           </nav>
         </div>

@@ -30,6 +30,7 @@ import DriverSummary from './pages/Delivery/Summary';
 import AdminDashboard from './pages/Admin/Dashboard';
 import AdminUsers from './pages/Admin/AdminUsers';
 import AdminOrders from './pages/Admin/AdminOrders';
+import PendingApprovals from './pages/Admin/PendingApprovals';
 
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
@@ -161,6 +162,7 @@ function App() {
           <Route index element={<AdminDashboard />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="users" element={<AdminUsers />} />
+          <Route path="pending-approvals" element={<PendingApprovals />} />
           <Route path="profile" element={<Profile />} />
         </Route>
 
