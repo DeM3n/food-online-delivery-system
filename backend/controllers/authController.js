@@ -72,7 +72,7 @@ exports.getProfile = async (req, res) => {
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
-    const updatedUser = await authService.updateProfile(req.user.id, req.body);
+    const updatedUser = await authService.updateProfile(req.user.id, req.body, req.io);
     res.json({
       success: true,
       data: updatedUser

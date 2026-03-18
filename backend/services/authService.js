@@ -110,8 +110,8 @@ class AuthService {
         return user;
     }
 
-    async updateProfile(userId, updateData) {
-        const { full_name, phone_number, password, restaurant_name, location, cuisine_type, vehicle_license, address } = updateData;
+    async updateProfile(userId, updateData, io) {
+        const { full_name, phone_number, password, restaurant_name, location, cuisine_type, vehicle_license, address, is_open } = updateData;
 
         const user = await User.findByPk(userId);
         if (!user) {
@@ -127,10 +127,20 @@ class AuthService {
         if (user.role === 'restaurant') {
             const restaurant = await Restaurant.findOne({ where: { user_id: user.id } });
             if (restaurant) {
+                const wasOpen = restaurant.is_open;
                 if (restaurant_name) restaurant.name = restaurant_name;
                 if (location) restaurant.location = location;
                 if (cuisine_type) restaurant.cuisine_type = cuisine_type;
+                if (typeof is_open === 'boolean') restaurant.is_open = is_open;
                 await restaurant.save();
+
+                if (io && wasOpen !== restaurant.is_open) {
+                    io.emit('RESTAURANT_STATUS_UPDATED', {
+                        restaurantId: restaurant.id,
+                        name: restaurant.name,
+                        is_open: restaurant.is_open
+                    });
+                }
             }
         } else if (user.role === 'delivery_partner') {
             const driver = await DeliveryPartner.findOne({ where: { user_id: user.id } });

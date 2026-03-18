@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { addToCartAsync } from '../../redux/slices/cartSlice';
 import axios from '../../api/axios';
@@ -8,28 +8,38 @@ import socket from '../../socket';
 
 export default function RestaurantMenu() {
     const { restaurantId } = useParams();
+    const navigate = useNavigate();
     const dispatch = useDispatch();
     const [restaurant, setRestaurant] = useState(null);
     const [menu, setMenu] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [restaurantClosed, setRestaurantClosed] = useState(false);
+    const [closedMessage, setClosedMessage] = useState('This restaurant is currently closed.');
 
     useEffect(() => {
         if (!restaurantId) return;
 
         const fetchMenuData = async () => {
             try {
-                const [resResponse, menuResponse] = await Promise.all([
-                    axios.get(`/restaurants/${restaurantId}`),
-                    axios.get(`/menu/full/${restaurantId}`)
-                ]);
+                const resResponse = await axios.get(`/restaurants/${restaurantId}`);
 
                 if (resResponse.data.success) {
                     setRestaurant(resResponse.data.data);
-                }
-                if (menuResponse.data.success) {
-                    setMenu(menuResponse.data.data);
+                    setRestaurantClosed(false);
+
+                    const menuResponse = await axios.get(`/menu/full/${restaurantId}`);
+                    if (menuResponse.data.success) {
+                        setMenu(menuResponse.data.data);
+                    }
                 }
             } catch (error) {
+                if (error.response?.data?.type === 'RESTAURANT_CLOSED') {
+                    setRestaurantClosed(true);
+                    setClosedMessage(error.response?.data?.message || 'This restaurant is currently closed.');
+                    setRestaurant(null);
+                    setMenu([]);
+                    return;
+                }
                 console.error('Error fetching menu:', error);
             } finally {
                 setLoading(false);
@@ -52,12 +62,40 @@ export default function RestaurantMenu() {
             }
         });
 
+        socket.on('RESTAURANT_STATUS_UPDATED', (data) => {
+            if (String(data.restaurantId) !== String(restaurantId)) return;
+
+            if (!data.is_open) {
+                setRestaurantClosed(true);
+                setClosedMessage(`${data.name || 'This restaurant'} is currently closed.`);
+                notification.warning({
+                    message: 'Restaurant closed',
+                    description: `${data.name || 'This restaurant'} is no longer accepting orders.`,
+                    placement: 'topRight'
+                });
+            } else {
+                setRestaurantClosed(false);
+                setClosedMessage('');
+                setRestaurant((prev) => prev ? { ...prev, is_open: true } : prev);
+            }
+        });
+
         return () => {
             socket.off('MENU_ITEM_UPDATED');
+            socket.off('RESTAURANT_STATUS_UPDATED');
         };
     }, [restaurantId]);
 
     const handleAdd = async (item) => {
+        if (restaurantClosed || !restaurant?.is_open) {
+            notification.warning({
+                message: 'Restaurant is closed',
+                description: 'You cannot add items while this restaurant is closed.',
+                placement: 'topRight'
+            });
+            return;
+        }
+
         const loadingNotify = notification.info({
             message: 'Đang thêm...',
             description: 'Vui lòng đợi trong giây lát',
@@ -93,6 +131,23 @@ export default function RestaurantMenu() {
             <p className="mt-4 text-gray-500 font-medium text-lg">Loading delicious menu...</p>
         </div>
     );
+
+    if (restaurantClosed) {
+        return (
+            <div className="py-20 text-center flex flex-col items-center bg-white rounded-3xl border border-red-100 shadow-soft">
+                <span className="text-6xl mb-4">🔒</span>
+                <h2 className="text-3xl font-bold text-gray-800">Restaurant Closed</h2>
+                <p className="text-gray-500 mt-2 mb-6">{closedMessage}</p>
+                <button
+                    type="button"
+                    onClick={() => navigate('/customer/restaurants')}
+                    className="btn-primary px-8 py-3"
+                >
+                    Back to Restaurants
+                </button>
+            </div>
+        );
+    }
 
     if (!restaurant) return (
         <div className="py-20 text-center flex flex-col items-center">

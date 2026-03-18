@@ -199,6 +199,11 @@ class OrderService {
     
         const restaurant = await Restaurant.findByPk(restaurant_id);
         if (!restaurant) throw new Error('Restaurant not found');
+                if (!restaurant.is_open) {
+                    const error = new Error('Restaurant is currently closed');
+                    error.type = 'RESTAURANT_CLOSED';
+                    throw error;
+                }
     
         const address = await Address.findOne({
           where: { id: delivery_address_id, customer_id: customer.id }

@@ -1,4 +1,4 @@
-const { Cart, CartItem, MenuItem, Customer } = require('../models');
+const { Cart, CartItem, MenuItem, Customer, Restaurant } = require('../models');
 
 class CartService {
     async getCart(userId) {
@@ -24,6 +24,27 @@ class CartService {
         const { menu_item_id, quantity, restaurant_id } = itemData;
         const customer = await Customer.findOne({ where: { user_id: userId } });
         if (!customer) throw new Error('Customer not found');
+
+        if (!restaurant_id) throw new Error('restaurant_id is required');
+        if (!menu_item_id) throw new Error('menu_item_id is required');
+        if (!quantity || Number(quantity) <= 0) throw new Error('quantity must be greater than 0');
+
+        const restaurant = await Restaurant.findByPk(restaurant_id);
+        if (!restaurant) throw new Error('Restaurant not found');
+        if (!restaurant.is_open) {
+            const error = new Error('Restaurant is currently closed');
+            error.type = 'RESTAURANT_CLOSED';
+            throw error;
+        }
+
+        const menuItem = await MenuItem.findByPk(menu_item_id);
+        if (!menuItem) throw new Error('Menu item not found');
+        if (String(menuItem.restaurant_id) !== String(restaurant_id)) {
+            throw new Error('Menu item does not belong to this restaurant');
+        }
+        if (!menuItem.is_available) {
+            throw new Error('Menu item is currently unavailable');
+        }
         
         let cart = await Cart.findOne({ where: { customer_id: customer.id } });
 
@@ -42,13 +63,13 @@ class CartService {
         });
 
         if (cartItem) {
-            cartItem.quantity += quantity;
+            cartItem.quantity += Number(quantity);
             await cartItem.save();
         } else {
             cartItem = await CartItem.create({
                 cart_id: cart.id,
                 menu_item_id,
-                quantity
+                quantity: Number(quantity)
             });
         }
         return cartItem;

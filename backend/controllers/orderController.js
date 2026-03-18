@@ -94,6 +94,8 @@ exports.createOrder = async (req, res) => {
     console.error(error);
     const statusCode = error.message.includes('not found')
       ? 404
+            : error.type === 'RESTAURANT_CLOSED'
+            ? 400
       : error.type === 'AVAILABILITY_CONFLICT'
       ? 400
       : 500;

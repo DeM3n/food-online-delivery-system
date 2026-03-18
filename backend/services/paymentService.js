@@ -9,6 +9,7 @@ const {
   Cart,
   CartItem,
   MenuItem,
+  Restaurant,
   User,
 } = require('../models');
 const PaymentGatewayFactory = require('../factories/paymentGatewayFactory');
@@ -223,6 +224,14 @@ class PaymentService {
     const customer = await Customer.findOne({ where: { user_id: userId } });
     const createDate = this.formatVnpDate(new Date());
     if (!customer) throw new Error('Customer not found');
+
+    const restaurant = await Restaurant.findByPk(restaurantId);
+    if (!restaurant) throw new Error('Restaurant not found');
+    if (!restaurant.is_open) {
+      const error = new Error('Restaurant is currently closed');
+      error.type = 'RESTAURANT_CLOSED';
+      throw error;
+    }
 
     const address = await Address.findOne({
       where: {

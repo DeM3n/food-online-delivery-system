@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import axios from '../../api/axios';
 import socket from '../../socket';
 import { notification } from 'antd';
+import { loginSuccess } from '../../redux/slices/authSlice';
 
 export default function RestaurantDashboard() {
   const { profile, user, token } = useSelector(state => state.auth);
+  const dispatch = useDispatch();
   const [orders, setOrders] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRestaurantOpen, setIsRestaurantOpen] = useState(Boolean(profile?.is_open));
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  useEffect(() => {
+    setIsRestaurantOpen(Boolean(profile?.is_open));
+  }, [profile?.is_open]);
 
   const fetchData = async () => {
     try {
@@ -88,15 +96,69 @@ export default function RestaurantDashboard() {
 
   if (loading) return <div className="py-20 text-center text-xl">Loading dashboard...</div>;
 
+  const handleToggleRestaurantStatus = async () => {
+    if (!profile?.id || updatingStatus) return;
+
+    const nextStatus = !isRestaurantOpen;
+    try {
+      setUpdatingStatus(true);
+      const response = await axios.put('/auth/profile', { is_open: nextStatus });
+
+      if (response.data.success) {
+        const updatedData = response.data.data;
+        let activeProfile = null;
+        if (updatedData.Customer) activeProfile = updatedData.Customer;
+        else if (updatedData.Restaurant) activeProfile = updatedData.Restaurant;
+        else if (updatedData.DeliveryPartner) activeProfile = updatedData.DeliveryPartner;
+        else if (updatedData.Admin) activeProfile = updatedData.Admin;
+
+        dispatch(loginSuccess({
+          user: {
+            id: updatedData.id,
+            email: updatedData.email,
+            role: updatedData.role,
+            full_name: updatedData.full_name,
+            phone_number: updatedData.phone_number
+          },
+          profile: activeProfile,
+          token
+        }));
+
+        setIsRestaurantOpen(Boolean(activeProfile?.is_open));
+        notification.success({
+          message: 'Restaurant status updated',
+          description: nextStatus
+            ? 'Your restaurant is now OPEN for customers.'
+            : 'Your restaurant is now CLOSED for customers.',
+          placement: 'topRight'
+        });
+      }
+    } catch (error) {
+      notification.error({
+        message: 'Unable to update status',
+        description: error.response?.data?.message || 'Please try again.',
+        placement: 'topRight'
+      });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   return (
     <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">{profile?.name || 'Restaurant'} Operations</h1>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-500">Status:</span>
-          <span className={`${profile?.is_open ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'} px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider`}>
-            {profile?.is_open ? 'Open' : 'Closed'}
-          </span>
+          <button
+            type="button"
+            onClick={handleToggleRestaurantStatus}
+            disabled={updatingStatus}
+            className={`${isRestaurantOpen ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'} px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-70 disabled:cursor-not-allowed`}
+            title="Click to change open/closed status"
+          >
+            {updatingStatus ? 'Updating...' : isRestaurantOpen ? 'Open (Click to close)' : 'Closed (Click to open)'}
+          </button>
         </div>
       </div>
 

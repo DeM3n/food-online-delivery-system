@@ -4,8 +4,13 @@ const { Op } = require('sequelize');
 class RestaurantService {
     async getAllRestaurants(query) {
         const { search, category } = query;
-        let where = { is_open: true };
-        let include = [{ model: User, attributes: ['email', 'is_active'] }];
+        const where = {};
+        let include = [{
+            model: User,
+            attributes: ['email', 'is_active'],
+            where: { is_active: true },
+            required: true
+        }];
 
         if (search) {
             where[Op.or] = [
@@ -43,11 +48,19 @@ class RestaurantService {
         });
     }
 
-    async getRestaurantById(id) {
+    async getRestaurantById(id, options = {}) {
+        const { allowClosed = false } = options;
         const restaurant = await Restaurant.findByPk(id);
         if (!restaurant) {
             throw new Error('Restaurant not found');
         }
+
+        if (!allowClosed && !restaurant.is_open) {
+            const error = new Error('Restaurant is currently closed');
+            error.type = 'RESTAURANT_CLOSED';
+            throw error;
+        }
+
         return restaurant;
     }
 }

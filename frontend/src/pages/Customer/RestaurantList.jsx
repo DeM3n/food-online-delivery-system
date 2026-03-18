@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from '../../api/axios';
+import socket from '../../socket';
 
 export default function RestaurantList() {
   const navigate = useNavigate();
@@ -38,6 +39,22 @@ export default function RestaurantList() {
     };
     fetchRestaurants();
   }, [searchParam, categoryParam]);
+
+  useEffect(() => {
+    const handleRestaurantStatusUpdated = (data) => {
+      setRestaurants((prev) => prev.map((restaurant) => (
+        String(restaurant.id) === String(data.restaurantId)
+          ? { ...restaurant, is_open: data.is_open }
+          : restaurant
+      )));
+    };
+
+    socket.on('RESTAURANT_STATUS_UPDATED', handleRestaurantStatusUpdated);
+
+    return () => {
+      socket.off('RESTAURANT_STATUS_UPDATED', handleRestaurantStatusUpdated);
+    };
+  }, []);
 
   const handleSearch = () => {
     const params = new URLSearchParams();
@@ -95,8 +112,12 @@ export default function RestaurantList() {
           restaurants.map(rest => (
             <div
               key={rest.id}
-              className="card overflow-hidden group cursor-pointer border border-gray-100"
-              onClick={() => navigate(`/customer/restaurant/${rest.id}`)}
+              className={`card overflow-hidden group border border-gray-100 ${rest.is_open ? 'cursor-pointer' : 'cursor-not-allowed opacity-90'}`}
+              onClick={() => {
+                if (rest.is_open) {
+                  navigate(`/customer/restaurant/${rest.id}`);
+                }
+              }}
             >
               <div className="h-48 overflow-hidden relative">
                 <img
@@ -120,13 +141,16 @@ export default function RestaurantList() {
                   <span className="flex items-center gap-1">{rest.is_open ? '🟢 Open Now' : '🔴 Closed'}</span>
                 </div>
                 <button
-                  className="w-full mt-4 py-2 bg-orange-50 hover:bg-orange-100 text-primary rounded-lg font-semibold transition-colors"
+                  disabled={!rest.is_open}
+                  className={`w-full mt-4 py-2 rounded-lg font-semibold transition-colors ${rest.is_open ? 'bg-orange-50 hover:bg-orange-100 text-primary' : 'bg-gray-100 text-gray-500 cursor-not-allowed'}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/customer/restaurant/${rest.id}`);
+                    if (rest.is_open) {
+                      navigate(`/customer/restaurant/${rest.id}`);
+                    }
                   }}
                 >
-                  View Menu
+                  {rest.is_open ? 'View Menu' : 'Restaurant Closed'}
                 </button>
               </div>
             </div>

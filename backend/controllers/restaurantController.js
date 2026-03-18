@@ -22,7 +22,10 @@ exports.getRestaurantById = async (req, res) => {
         res.json({ success: true, data: restaurant });
     } catch (error) {
         console.error(error);
-        const statusCode = error.message === 'Restaurant not found' ? 404 : 500;
-        res.status(statusCode).json({ success: false, message: error.message });
+        const statusCode =
+            error.message === 'Restaurant not found' ? 404 :
+            error.type === 'RESTAURANT_CLOSED' ? 403 :
+            500;
+        res.status(statusCode).json({ success: false, message: error.message, type: error.type });
     }
 };

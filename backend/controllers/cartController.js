@@ -23,7 +23,11 @@ exports.addItemToCart = async (req, res) => {
         res.json({ success: true, message: 'Item added to cart' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ success: false, message: 'Server Error' });
+        const statusCode =
+            error.message.includes('not found') ? 404 :
+            error.type === 'RESTAURANT_CLOSED' ? 400 :
+            400;
+        res.status(statusCode).json({ success: false, message: error.message, type: error.type });
     }
 };
 
