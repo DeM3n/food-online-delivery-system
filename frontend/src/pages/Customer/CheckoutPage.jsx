@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../api/axios';
@@ -13,7 +13,16 @@ export default function CheckoutPage() {
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(false);
-    const [address, setAddress] = useState(profile?.Addresses?.[0]?.street || '');
+    const [address, setAddress] = useState('');
+    useEffect(() => {
+        const defaultAddress = profile?.Addresses?.find(address => address.is_default === true);
+        if (defaultAddress) {
+            setAddress(defaultAddress.street);
+        } else {
+            setAddress('');
+        }
+    }, [profile]);
+
     const [phone, setPhone] = useState(user?.phone_number || '');
     const [notes, setNotes] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('cod');

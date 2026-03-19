@@ -452,7 +452,7 @@ class OrderService {
             },
             include: [
                 { model: Restaurant, attributes: ['name', 'user_id'] },
-                { model: Address, attributes: ['street', 'city'] },
+                { model: Address, attributes: ['street', 'city', 'latitude', 'longitude'] },
                 { model: Customer, include: [{ model: User, attributes: ['full_name', 'phone_number'] }] }
             ],
             order: [['updated_at', 'DESC']]
@@ -521,7 +521,7 @@ class OrderService {
 
         // Chỉ đổi sang refunded khi refund thành công thật
         if (refund.refundResponseCode === '99') {
-            order.status = 'refunded';
+            order.status = 'cancelled';
             order.payment_status = 'refunded';
         } else {
             order.status = 'cancelled';
