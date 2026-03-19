@@ -1,5 +1,6 @@
 const { User, Restaurant, Customer, DeliveryPartner, Order, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const { sendPendingApprovalStatusEmail } = require('./mailService');
 
 class AdminService {
     mapPendingApprovalItem(user) {
@@ -258,6 +259,17 @@ class AdminService {
         user.is_active = true;
         await user.save();
 
+        try {
+            await sendPendingApprovalStatusEmail({
+                to: user.email,
+                fullName: user.full_name,
+                accountType: user.role === 'restaurant' ? 'restaurant' : 'delivery_partner',
+                status: 'APPROVED'
+            });
+        } catch (mailError) {
+            console.error('Failed to send approval email:', mailError.message || mailError);
+        }
+
         return { id: user.id, status: 'APPROVED' };
     }
 
@@ -273,7 +285,23 @@ class AdminService {
             throw new Error('Approval request not found');
         }
 
+        const email = user.email;
+        const fullName = user.full_name;
+        const accountType = user.role === 'restaurant' ? 'restaurant' : 'delivery_partner';
+
         await user.destroy();
+
+        try {
+            await sendPendingApprovalStatusEmail({
+                to: email,
+                fullName,
+                accountType,
+                status: 'REJECTED',
+                reason
+            });
+        } catch (mailError) {
+            console.error('Failed to send rejection email:', mailError.message || mailError);
+        }
 
         return { id: user.id, status: 'REJECTED', reason: reason || null };
     }

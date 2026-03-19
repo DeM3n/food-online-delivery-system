@@ -235,7 +235,79 @@ const sendRefundEmail = async ({
   });
 };
 
+const sendPendingApprovalStatusEmail = async ({
+  to,
+  fullName,
+  accountType,
+  status,
+  reason,
+}) => {
+  const normalizedStatus = String(status || '').toUpperCase();
+  const isApproved = normalizedStatus === 'APPROVED';
+  const roleLabel = accountType === 'restaurant' ? 'nha hang' : 'tai khoan giao hang';
+
+  const subject = isApproved
+    ? `Tai khoan ${roleLabel} cua ban da duoc phe duyet`
+    : `Cap nhat ket qua xet duyet tai khoan ${roleLabel}`;
+
+  const html = `
+    <div style="margin:0; padding:0; background-color:#f9fafb; font-family:Arial,Helvetica,sans-serif; color:#1f2937;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f9fafb; margin:0; padding:24px 0;">
+        <tr>
+          <td align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:640px; background-color:#ffffff; border:1px solid #f3f4f6; border-radius:20px; overflow:hidden;">
+              <tr>
+                <td style="padding:28px 32px 22px 32px; border-bottom:1px solid #f3f4f6;">
+                  <h1 style="margin:0 0 10px 0; font-size:24px; line-height:1.3; font-weight:800; color:#111827;">
+                    ${isApproved ? 'Tai khoan da duoc phe duyet' : 'Ket qua xet duyet tai khoan'}
+                  </h1>
+                  <p style="margin:0; font-size:15px; line-height:1.7; color:#4b5563;">
+                    Xin chao <strong style="color:#111827;">${fullName || 'ban'}</strong>,
+                    tai khoan ${roleLabel} cua ban tren OFDS da duoc cap nhat trang thai.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:22px 32px;">
+                  <div style="padding:16px 18px; border:1px solid #e5e7eb; border-radius:14px; background-color:#ffffff;">
+                    <div style="font-size:14px; color:#6b7280; margin-bottom:6px;">Trang thai</div>
+                    <div style="font-size:16px; font-weight:800; color:${isApproved ? '#166534' : '#991b1b'};">
+                      ${isApproved ? 'APPROVED' : 'REJECTED'}
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              ${!isApproved && reason ? `
+              <tr>
+                <td style="padding:0 32px 18px 32px;">
+                  <div style="padding:14px 16px; background:#fff7ed; border:1px solid #fdba74; border-radius:12px; color:#9a3412; font-size:14px; line-height:1.6;">
+                    <strong>Ly do:</strong> ${reason}
+                  </div>
+                </td>
+              </tr>
+              ` : ''}
+              <tr>
+                <td style="padding:0 32px 30px 32px; font-size:13px; color:#9ca3af; line-height:1.7;">
+                  Email nay duoc gui tu dong tu he thong OFDS.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  return transporter.sendMail({
+    from: process.env.MAIL_FROM || process.env.MAIL_USER,
+    to,
+    subject,
+    html,
+  });
+};
+
 module.exports = {
   sendDeliveredOrderEmail,
   sendRefundEmail,
+  sendPendingApprovalStatusEmail,
 };
