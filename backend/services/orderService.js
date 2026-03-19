@@ -452,7 +452,7 @@ class OrderService {
             },
             include: [
                 { model: Restaurant, attributes: ['name', 'user_id'] },
-                { model: Address, attributes: ['street', 'city'] },
+                { model: Address, attributes: ['street', 'city', 'latitude', 'longitude'] },
                 { model: Customer, include: [{ model: User, attributes: ['full_name', 'phone_number'] }] }
             ],
             order: [['updated_at', 'DESC']]
