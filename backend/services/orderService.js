@@ -3,6 +3,10 @@ const { Op } = require('sequelize');
 const paymentService = require('./paymentService');
 const { Payment } = require('../models');
 const { sendDeliveredOrderEmail } = require('./mailService');   
+const {
+    OrderStatusContext,
+    assertRoleCanUpdateStatus,
+} = require('../states/order/orderStatusState');
 
 class OrderService {
     async getRestaurantOrders(userId, statusFilter, date) {
@@ -307,6 +311,7 @@ class OrderService {
     
 
     async updateStatus(orderId, status, user, io) {
+        const nextStatus = String(status || '').toLowerCase();
         const order = await Order.findByPk(orderId, {
             include: [
                 {
@@ -324,9 +329,6 @@ class OrderService {
             if (!customer || order.customer_id !== customer.id) {
                 throw new Error('Not authorized to update this order');
             }
-            if (!['delivered', 'completed'].includes(status)) {
-                throw new Error('Customers can only confirm delivery or complete the order');
-            }
         } else if (user.role === 'restaurant') {
             const restaurant = await Restaurant.findOne({ where: { user_id: user.id } });
             if (!restaurant || order.restaurant_id !== restaurant.id) {
@@ -337,14 +339,17 @@ class OrderService {
             if (!driver || order.delivery_partner_id !== driver.id) {
                 throw new Error('Not authorized to update this delivery');
             }
-            if (status !== 'delivered') {
-                throw new Error('Drivers can only mark orders as delivered');
-            }
+        } else {
+            throw new Error('Not authorized to update this order');
         }
 
         const oldStatus = order.status;
+        assertRoleCanUpdateStatus({ role: user.role, targetStatus: nextStatus });
 
-        order.status = status;
+        const stateContext = new OrderStatusContext(oldStatus);
+        stateContext.transitionTo(nextStatus);
+
+        order.status = stateContext.getCurrentStatus();
         await order.save();
 
         const statusData = { orderId: order.id, status: order.status };
@@ -357,7 +362,7 @@ class OrderService {
             io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', statusData);
         }
 
-        if (status === 'preparing' && io) {
+        if (order.status === 'preparing' && io) {
             io.to('available_deliveries').emit('AVAILABLE_DELIVERY', {
                 orderId: order.id,
                 restaurantName: order.Restaurant?.name || 'Restaurant'
@@ -365,7 +370,7 @@ class OrderService {
         }
 
         // Gửi mail khi vừa chuyển sang delivered
-        if (oldStatus !== 'delivered' && status === 'delivered') {
+        if (oldStatus !== 'delivered' && order.status === 'delivered') {
             try {
                 const customerEmail = order.Customer?.User?.email;
                 const customerName = order.Customer?.User?.full_name;
@@ -413,8 +418,11 @@ class OrderService {
             throw new Error('Order is no longer available');
         }
 
+        const stateContext = new OrderStatusContext(order.status);
+        stateContext.transitionTo('picked_up');
+
         order.delivery_partner_id = driverId;
-        order.status = 'picked_up';
+        order.status = stateContext.getCurrentStatus();
         await order.save();
 
         const fullOrder = await Order.findByPk(order.id, {

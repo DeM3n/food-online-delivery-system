@@ -76,7 +76,12 @@ export default function RestaurantDashboard() {
   const currentYear = now.getFullYear();
 
   const ordersThisMonth = orders.filter(o => {
-    const d = new Date(o.createdAt);
+    const createdAt = o.created_at || o.createdAt;
+    if (!createdAt) return false;
+
+    const d = new Date(createdAt);
+    if (Number.isNaN(d.getTime())) return false;
+
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
   });
 
