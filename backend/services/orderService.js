@@ -521,7 +521,7 @@ class OrderService {
 
         // Chỉ đổi sang refunded khi refund thành công thật
         if (refund.refundResponseCode === '99') {
-            order.status = 'refunded';
+            order.status = 'cancelled';
             order.payment_status = 'refunded';
         } else {
             order.status = 'cancelled';
