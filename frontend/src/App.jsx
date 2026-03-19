@@ -36,8 +36,10 @@ import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
 import Profile from './pages/Auth/Profile';
 
-
 function App() {
+
+  
+
   const { user, isAuthenticated } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const token = useSelector((state) => state.auth.token);
@@ -165,6 +167,8 @@ function App() {
           <Route path="pending-approvals" element={<PendingApprovals />} />
           <Route path="profile" element={<Profile />} />
         </Route>
+
+        
 
         {/* Default route */}
         <Route path="*" element={<Navigate to="/login" replace />} />

@@ -14,6 +14,8 @@ import {
   UserOutlined
 } from '@ant-design/icons';
 import socket from '../../socket';
+import { Outlet } from 'react-router-dom';
+import AppMap from '../../pages/Map/Map';
 
 export default function DeliveryOrders() {
   const { profile, token } = useSelector(state => state.auth);
@@ -141,6 +143,12 @@ export default function DeliveryOrders() {
             >
               Finish Delivery
             </button>
+          </div>
+
+          <div className="w-full flex justify-center items-center my-8">
+            <div className="w-full max-w-5xl h-[500px] rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
+              <AppMap destinationLat={activeDelivery.Address?.latitude} destinationLng={activeDelivery.Address?.longitude} />
+            </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
