@@ -14,12 +14,18 @@ export default function CheckoutPage() {
 
     const [loading, setLoading] = useState(false);
     const [address, setAddress] = useState('');
+    const [selectedAddressId, setSelectedAddressId] = useState('');
     useEffect(() => {
         const defaultAddress = profile?.Addresses?.find(address => address.is_default === true);
         if (defaultAddress) {
             setAddress(defaultAddress.street);
+            setSelectedAddressId(defaultAddress.id);
+        } else if (profile?.Addresses?.[0]) {
+            setAddress(profile.Addresses[0].street || '');
+            setSelectedAddressId(profile.Addresses[0].id);
         } else {
             setAddress('');
+            setSelectedAddressId('');
         }
     }, [profile]);
 
@@ -40,11 +46,20 @@ export default function CheckoutPage() {
             return;
         }
 
+        if (!selectedAddressId) {
+            notification.warning({
+                message: 'Missing Delivery Address',
+                description: 'Please update your default address in profile before placing order.',
+                placement: 'topRight'
+            });
+            return;
+        }
+
         try {
             setLoading(true);
             const orderData = {
                 restaurant_id: restaurantId,
-                delivery_address_id: profile?.Addresses?.[0]?.id,
+                delivery_address_id: selectedAddressId,
                 notes: notes || "No notes provided",
                 payment_method: paymentMethod,
                 items: items.map(item => ({
@@ -57,7 +72,7 @@ export default function CheckoutPage() {
             if(paymentMethod === "vnpay"){
                 response = await axios.post('/payments/create-vnpay', {
                     restaurantId: restaurantId,
-                    addressId: profile?.Addresses?.[0]?.id,
+                    addressId: selectedAddressId,
                     delivery_fee: 15000,
                     notes: notes || "No notes provided"
                 });
@@ -144,11 +159,12 @@ export default function CheckoutPage() {
                                         type="text" 
                                         className="input-field pl-10" 
                                         value={address}
-                                        onChange={(e) => setAddress(e.target.value)}
-                                        placeholder="e.g. 123 ABC Street, District 1..."
+                                        readOnly
+                                        placeholder="Set your delivery address in Profile"
                                     />
                                     <HomeOutlined className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                 </div>
+                                <p className="text-xs text-gray-400 mt-2">This address is taken from your default profile address.</p>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>

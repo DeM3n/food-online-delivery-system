@@ -155,7 +155,7 @@ export default function DeliveryOrders() {
             <div className="bg-gray-50 rounded-3xl p-8 border border-gray-100">
               <h3 className="font-black text-gray-400 uppercase text-[10px] tracking-widest mb-4">Pickup</h3>
               <p className="font-black text-xl text-gray-900 mb-2">{activeDelivery.Restaurant?.name}</p>
-              <p className="text-sm text-gray-500 line-clamp-2">📍 {activeDelivery.Restaurant?.address || 'Restaurant Address Unknown'}</p>
+              <p className="text-sm text-gray-500 line-clamp-2">📍 {activeDelivery.Restaurant?.location || 'Restaurant Address Unknown'}</p>
             </div>
 
             <div className="bg-gray-50 rounded-3xl p-8 border border-gray-100">

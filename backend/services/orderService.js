@@ -369,24 +369,21 @@ class OrderService {
             });
         }
 
-        // Gửi mail khi vừa chuyển sang delivered
+        // Send delivered email in background so status update is not blocked by SMTP latency.
         if (oldStatus !== 'delivered' && order.status === 'delivered') {
-            try {
-                const customerEmail = order.Customer?.User?.email;
-                const customerName = order.Customer?.User?.full_name;
-                const restaurantName = order.Restaurant?.name;
+            const customerEmail = order.Customer?.User?.email;
+            const customerName = order.Customer?.User?.full_name;
+            const restaurantName = order.Restaurant?.name;
 
-                if (customerEmail) {
-                    await sendDeliveredOrderEmail({
-                        to: customerEmail,
-                        customerName,
-                        orderId: order.id,
-                        restaurantName,
-                    });
-                }
-            } catch (mailError) {
-                console.error('Send delivered email failed:', mailError);
-                // Không throw để tránh update status thành công nhưng fail vì lỗi mail
+            if (customerEmail) {
+                sendDeliveredOrderEmail({
+                    to: customerEmail,
+                    customerName,
+                    orderId: order.id,
+                    restaurantName,
+                }).catch((mailError) => {
+                    console.error('Send delivered email failed:', mailError);
+                });
             }
         }
 
@@ -400,7 +397,7 @@ class OrderService {
                 delivery_partner_id: null
             },
             include: [
-                { model: Restaurant, attributes: ['name', 'user_id'] },
+                { model: Restaurant, attributes: ['name', 'user_id', 'location'] },
                 { model: Address, attributes: ['street', 'city'] },
                 { model: Customer, include: [{ model: User, attributes: ['full_name', 'phone_number'] }] }
             ],
@@ -459,7 +456,7 @@ class OrderService {
                 status: 'picked_up'
             },
             include: [
-                { model: Restaurant, attributes: ['name', 'user_id'] },
+                { model: Restaurant, attributes: ['name', 'user_id', 'location'] },
                 { model: Address, attributes: ['street', 'city', 'latitude', 'longitude'] },
                 { model: Customer, include: [{ model: User, attributes: ['full_name', 'phone_number'] }] }
             ],
@@ -477,7 +474,7 @@ class OrderService {
                 status: { [Op.in]: ['delivered', 'completed'] }
             },
             include: [
-                { model: Restaurant, attributes: ['name', 'user_id'] },
+                { model: Restaurant, attributes: ['name', 'user_id', 'location'] },
                 { model: Address, attributes: ['street', 'city'] }
             ],
             order: [['updated_at', 'DESC']]
