@@ -48,14 +48,29 @@ class AdminService {
 
     async getSystemStats() {
         const [userCount, restaurantCount, driverCount, orderStats] = await Promise.all([
-            User.count(),
-            Restaurant.count(),
-            DeliveryPartner.count(),
+            User.count({ where: { is_active: true } }),
+            Restaurant.count({
+                include: [{
+                    model: User,
+                    required: true,
+                    where: { is_active: true }
+                }]
+            }),
+            DeliveryPartner.count({
+                include: [{
+                    model: User,
+                    required: true,
+                    where: { is_active: true }
+                }]
+            }),
             Order.findAll({
                 attributes: [
                     [sequelize.fn('SUM', sequelize.col('total_amount')), 'totalRevenue'],
                     [sequelize.fn('COUNT', sequelize.col('id')), 'totalOrders']
-                ]
+                ],
+                where: {
+                    status: { [Op.in]: ['delivered', 'completed'] }
+                }
             })
         ]);
 
@@ -68,10 +83,27 @@ class AdminService {
         };
     }
 
-    async getAllUsers() {
+    async getAllUsers(status) {
+        let where = {};
+        
+        if (status === 'active') {
+            where.is_active = true;
+            // Active users must not be deleted
+        } else if (status === 'inactive') {
+            // Inactive can be either is_active=false OR deleted (rejected)
+            where = {
+                [Op.or]: [
+                    { is_active: false },
+                    { deleted_at: { [Op.ne]: null } }
+                ]
+            };
+        }
+
         return await User.findAll({
-            attributes: ['id', 'email', 'full_name', 'phone_number', 'role', 'is_active', 'created_at'],
-            order: [['created_at', 'DESC']]
+            where,
+            attributes: ['id', 'email', 'full_name', 'phone_number', 'role', 'is_active', 'created_at', 'deleted_at'],
+            order: [['created_at', 'DESC']],
+            paranoid: false // Include soft-deleted users
         });
     }
 
@@ -98,7 +130,7 @@ class AdminService {
         };
     }
 
-    async getAllOrders(restaurantId, statusFilter, page = 1, limit = 20) {
+    async getAllOrders(restaurantId, statusFilter, page = 1, limit = 20, month, year) {
         const where = {};
         if (restaurantId) {
             where.restaurant_id = restaurantId;
@@ -110,6 +142,16 @@ class AdminService {
             } else {
                 where.status = statusFilter;
             }
+        }
+
+        if (month && year) {
+            const startOfMonth = new Date(year, month - 1, 1);
+            const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+            where.created_at = { [Op.between]: [startOfMonth, endOfMonth] };
+        } else if (year) {
+            const startOfYear = new Date(year, 0, 1);
+            const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999);
+            where.created_at = { [Op.between]: [startOfYear, endOfYear] };
         }
 
         const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
@@ -128,8 +170,9 @@ class AdminService {
         });
 
         // Get counts for each status
-        const countWhere = {};
-        if (restaurantId) countWhere.restaurant_id = restaurantId;
+        const countWhere = { ...where };
+        // Remove status from countWhere as we need counts for all statuses
+        delete countWhere.status;
 
         const statusCounts = await Order.findAll({
             attributes: ['status', [sequelize.fn('COUNT', sequelize.col('status')), 'count']],
@@ -278,7 +321,8 @@ class AdminService {
             where: {
                 id: userId,
                 role: { [Op.in]: ['restaurant', 'delivery_partner'] }
-            }
+            },
+            include: [Restaurant, DeliveryPartner]
         });
 
         if (!user) {
@@ -289,6 +333,14 @@ class AdminService {
         const fullName = user.full_name;
         const accountType = user.role === 'restaurant' ? 'restaurant' : 'delivery_partner';
 
+        // Soft delete the profile if it exists
+        if (user.Restaurant) {
+            await user.Restaurant.destroy();
+        } else if (user.DeliveryPartner) {
+            await user.DeliveryPartner.destroy();
+        }
+
+        // Soft delete the user record
         await user.destroy();
 
         try {

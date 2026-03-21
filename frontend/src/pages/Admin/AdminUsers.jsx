@@ -7,22 +7,27 @@ export default function AdminUsers() {
   const { token } = useSelector(state => state.auth);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/admin/users', {
+        params: { status: statusFilter }
+      });
+      if (response.data.success) {
+        setUsers(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await axios.get('/admin/users');
-        if (response.data.success) {
-          setUsers(response.data.data);
-        }
-      } catch (error) {
-        console.error('Error fetching users:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchUsers();
-  }, [token]);
+  }, [token, statusFilter]);
 
   const updateUserStatus = async (userId, currentStatus) => {
     const nextStatus = !currentStatus;
@@ -35,9 +40,14 @@ export default function AdminUsers() {
     try {
       const response = await axios.put(`/admin/users/${userId}/status`, { is_active: nextStatus });
       if (response.data.success) {
-        setUsers(prev => prev.map(user => (
-          user.id === userId ? { ...user, is_active: nextStatus } : user
-        )));
+        // If we are in a filtered view, remove the user from the list instead of just updating
+        if (statusFilter !== 'all') {
+          setUsers(prev => prev.filter(user => user.id !== userId));
+        } else {
+          setUsers(prev => prev.map(user => (
+            user.id === userId ? { ...user, is_active: nextStatus } : user
+          )));
+        }
       }
     } catch (error) {
       console.error('Error updating user status:', error);
@@ -54,18 +64,42 @@ export default function AdminUsers() {
     }
   };
 
-  const getAccountStatusBadge = (isActive) => (
-    isActive
+  const getAccountStatusBadge = (user) => {
+    if (user.deleted_at) {
+      return <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-red-200">Rejected</span>;
+    }
+    return user.is_active
       ? <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-green-200">Active</span>
-      : <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-gray-200">Inactive</span>
-  );
+      : <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-amber-200">Pending</span>;
+  };
 
   return (
     <div className="animate-fade-in max-w-6xl mx-auto p-4 md:p-0">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">User Management</h1>
-          <p className="text-gray-500 mt-1">Manage all system users and their roles</p>
+          <h1 className="text-3xl font-black text-gray-800 tracking-tight">User Management</h1>
+          <p className="text-gray-500 font-medium mt-1">Manage all system users and their access roles</p>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="bg-white p-1.5 rounded-2xl shadow-soft border border-gray-100 flex gap-1">
+          {[
+            { id: 'all', label: 'All Users' },
+            { id: 'active', label: 'Active' },
+            { id: 'inactive', label: 'Inactive' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id)}
+              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                statusFilter === tab.id 
+                  ? 'bg-primary text-white shadow-md' 
+                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -113,7 +147,7 @@ export default function AdminUsers() {
                       {getRoleBadge(user.role)}
                     </td>
                     <td className="p-6">
-                      {getAccountStatusBadge(user.is_active)}
+                      {getAccountStatusBadge(user)}
                     </td>
                     <td className="p-6">
                       <div className="text-xs text-gray-500 font-medium">
@@ -121,16 +155,20 @@ export default function AdminUsers() {
                       </div>
                     </td>
                     <td className="p-6 text-right">
-                      <button
-                        onClick={() => updateUserStatus(user.id, user.is_active)}
-                        className={`text-xs font-bold transition-colors uppercase tracking-widest ${
-                          user.is_active
-                            ? 'text-red-600 hover:text-red-700'
-                            : 'text-green-600 hover:text-green-700'
-                        }`}
-                      >
-                        {user.is_active ? 'Deactivate' : 'Activate'}
-                      </button>
+                      {!user.deleted_at ? (
+                        <button
+                          onClick={() => updateUserStatus(user.id, user.is_active)}
+                          className={`text-xs font-bold transition-colors uppercase tracking-widest ${
+                            user.is_active
+                              ? 'text-red-600 hover:text-red-700'
+                              : 'text-green-600 hover:text-green-700'
+                          }`}
+                        >
+                          {user.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-gray-300 font-bold uppercase tracking-widest italic">Archived</span>
+                      )}
                     </td>
                   </tr>
                 ))}

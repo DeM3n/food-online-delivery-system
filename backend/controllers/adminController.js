@@ -12,7 +12,8 @@ exports.getSystemStats = async (req, res) => {
 
 exports.getAllUsers = async (req, res) => {
     try {
-        const users = await adminService.getAllUsers();
+        const { status } = req.query;
+        const users = await adminService.getAllUsers(status);
         res.json({ success: true, data: users });
     } catch (error) {
         console.error(error);
@@ -22,8 +23,8 @@ exports.getAllUsers = async (req, res) => {
 
 exports.getAllOrders = async (req, res) => {
     try {
-        const { restaurantId, status, page, limit } = req.query;
-        const result = await adminService.getAllOrders(restaurantId, status, page, limit);
+        const { restaurantId, status, page, limit, month, year } = req.query;
+        const result = await adminService.getAllOrders(restaurantId, status, page, limit, month, year);
         res.json({ success: true, data: result.orders, counts: result.counts, pagination: result.pagination });
     } catch (error) {
         console.error(error);

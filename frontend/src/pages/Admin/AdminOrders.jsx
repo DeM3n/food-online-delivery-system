@@ -18,6 +18,11 @@ export default function AdminOrders() {
   const [restaurants, setRestaurants] = useState([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('pending');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
   const [counts, setCounts] = useState({
     pending: 0,
     accepted: 0,
@@ -48,6 +53,8 @@ export default function AdminOrders() {
       setLoading(true);
       let url = `/admin/orders?status=${selectedStatus}&page=${currentPage}&limit=${pageSize}`;
       if (selectedRestaurant) url += `&restaurantId=${selectedRestaurant}`;
+      if (selectedMonth) url += `&month=${selectedMonth}`;
+      if (selectedYear) url += `&year=${selectedYear}`;
 
       const response = await axios.get(url);
       if (response.data.success) {
@@ -83,11 +90,11 @@ export default function AdminOrders() {
 
   useEffect(() => {
     fetchOrders();
-  }, [selectedRestaurant, selectedStatus, currentPage, pageSize]);
+  }, [selectedRestaurant, selectedStatus, currentPage, pageSize, selectedMonth, selectedYear]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedRestaurant, selectedStatus, pageSize]);
+  }, [selectedRestaurant, selectedStatus, pageSize, selectedMonth, selectedYear]);
 
   const statusTabs = [
     { key: 'pending', label: 'Pending', icon: <ClockCircleOutlined />, color: 'text-yellow-500', bg: 'bg-yellow-50' },
@@ -118,26 +125,139 @@ export default function AdminOrders() {
     }
   };
 
+  const filteredRestaurants = restaurants.filter(r => 
+    r.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const months = [
+    { value: '', label: 'All Months' },
+    { value: 1, label: 'January' },
+    { value: 2, label: 'February' },
+    { value: 3, label: 'March' },
+    { value: 4, label: 'April' },
+    { value: 5, label: 'May' },
+    { value: 6, label: 'June' },
+    { value: 7, label: 'July' },
+    { value: 8, label: 'August' },
+    { value: 9, label: 'September' },
+    { value: 10, label: 'October' },
+    { value: 11, label: 'November' },
+    { value: 12, label: 'December' },
+  ];
+
+  const currentYear = new Date().getFullYear();
+  const years = [
+    { value: '', label: 'All Years' },
+    ...Array.from({ length: 5 }, (_, i) => ({ value: currentYear - i, label: currentYear - i }))
+  ];
+
   return (
     <div className="animate-fade-in max-w-6xl mx-auto p-4 md:p-0">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Global Order Tracking</h1>
           <p className="text-gray-500 font-medium">Monitor and manage all system transactions</p>
         </div>
 
-        <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl shadow-soft border border-gray-100 w-full md:w-auto">
-          <FilterOutlined className="text-primary ml-2" />
-          <select
-            className="outline-none bg-transparent text-sm font-bold text-gray-700 min-w-[220px] cursor-pointer"
-            value={selectedRestaurant}
-            onChange={(e) => setSelectedRestaurant(e.target.value)}
-          >
-            <option value="">All Restaurants</option>
-            {restaurants.map(r => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          {/* Searchable Restaurant Filter */}
+          <div className="relative flex-1 md:flex-none">
+            <div 
+              className="flex items-center gap-3 bg-white p-2.5 rounded-2xl shadow-soft border border-gray-100 min-w-[220px] cursor-pointer"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <ShopOutlined className="text-primary ml-2" />
+              <div className="flex-1">
+                <div className="text-[10px] text-gray-400 font-bold uppercase leading-none mb-1">Restaurant</div>
+                <div className="text-sm font-bold text-gray-700 truncate">
+                  {selectedRestaurant ? restaurants.find(r => r.id === selectedRestaurant)?.name : 'All Restaurants'}
+                </div>
+              </div>
+              <FilterOutlined className="text-gray-300 text-xs mr-2" />
+            </div>
+
+            {isDropdownOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="p-3 border-b border-gray-50 bg-gray-50/50">
+                  <input 
+                    autoFocus
+                    type="text"
+                    placeholder="Search restaurant..."
+                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-primary transition-colors"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+                <div className="max-h-[300px] overflow-y-auto no-scrollbar">
+                  <div 
+                    className={`px-4 py-3 text-sm font-bold cursor-pointer hover:bg-primary/5 transition-colors ${!selectedRestaurant ? 'text-primary bg-primary/5' : 'text-gray-600'}`}
+                    onClick={() => {
+                      setSelectedRestaurant('');
+                      setIsDropdownOpen(false);
+                      setSearchTerm('');
+                    }}
+                  >
+                    All Restaurants
+                  </div>
+                  {filteredRestaurants.map(r => (
+                    <div 
+                      key={r.id}
+                      className={`px-4 py-3 text-sm font-bold cursor-pointer hover:bg-primary/5 transition-colors ${selectedRestaurant === r.id ? 'text-primary bg-primary/5' : 'text-gray-600'}`}
+                      onClick={() => {
+                        setSelectedRestaurant(r.id);
+                        setIsDropdownOpen(false);
+                        setSearchTerm('');
+                      }}
+                    >
+                      {r.name}
+                    </div>
+                  ))}
+                  {filteredRestaurants.length === 0 && (
+                    <div className="px-4 py-8 text-center text-gray-400 text-xs font-medium">
+                      No restaurants found
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Click outside to close */}
+            {isDropdownOpen && <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />}
+          </div>
+
+          {/* Month Filter */}
+          <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl shadow-soft border border-gray-100 flex-1 md:flex-none">
+            <ClockCircleOutlined className="text-primary ml-2" />
+            <div className="flex-1 pr-2">
+              <div className="text-[10px] text-gray-400 font-bold uppercase leading-none mb-1">Month</div>
+              <select
+                className="outline-none bg-transparent text-sm font-bold text-gray-700 w-full cursor-pointer appearance-none"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+              >
+                {months.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Year Filter */}
+          <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl shadow-soft border border-gray-100 flex-1 md:flex-none">
+            <ClockCircleOutlined className="text-primary ml-2" />
+            <div className="flex-1 pr-2">
+              <div className="text-[10px] text-gray-400 font-bold uppercase leading-none mb-1">Year</div>
+              <select
+                className="outline-none bg-transparent text-sm font-bold text-gray-700 w-full cursor-pointer appearance-none"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+              >
+                {years.map(y => (
+                  <option key={y.value} value={y.value}>{y.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
