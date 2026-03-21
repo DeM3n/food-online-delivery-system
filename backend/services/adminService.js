@@ -1,4 +1,4 @@
-const { User, Restaurant, Customer, DeliveryPartner, Order, sequelize } = require('../models');
+const { User, Restaurant, Customer, DeliveryPartner, Order, OrderItem, MenuItem, Address, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { sendPendingApprovalStatusEmail } = require('./mailService');
 
@@ -161,8 +161,27 @@ class AdminService {
         const { count: total, rows: orders } = await Order.findAndCountAll({
             where,
             include: [
-                { model: Restaurant, attributes: ['name'] },
-                { model: Customer, include: [{ model: User, attributes: ['full_name'] }] }
+                { 
+                    model: Restaurant, 
+                    attributes: ['name', 'location'],
+                    include: [{ model: User, attributes: ['phone_number'] }] 
+                },
+                { 
+                    model: Customer, 
+                    include: [{ model: User, attributes: ['full_name', 'phone_number'] }] 
+                },
+                {
+                    model: OrderItem,
+                    include: [{ model: MenuItem, attributes: ['name', 'price', 'image_url'] }]
+                },
+                {
+                    model: DeliveryPartner,
+                    include: [{ model: User, attributes: ['full_name', 'phone_number'] }]
+                },
+                {
+                    model: Address,
+                    attributes: ['street', 'city', 'label']
+                }
             ],
             limit: parsedLimit,
             offset,

@@ -284,6 +284,12 @@ class OrderService {
         stateContext.transitionTo(nextStatus);
 
         order.status = stateContext.getCurrentStatus();
+
+        // If order is COD and status is delivered or completed, mark as paid
+        if ((order.status === 'delivered' || order.status === 'completed') && order.payment_method === 'cod') {
+            order.payment_status = 'paid';
+        }
+
         await order.save();
 
         const statusData = { orderId: order.id, status: order.status };
@@ -466,6 +472,7 @@ class OrderService {
             order.payment_status = 'refunded';
         } else {
             order.status = 'cancelled';
+            order.payment_status = 'cancelled';
         }
 
         await order.save();

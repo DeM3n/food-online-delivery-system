@@ -9,8 +9,14 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   CarOutlined,
-  FilterOutlined
+  FilterOutlined,
+  EyeOutlined,
+  PhoneOutlined,
+  EnvironmentOutlined,
+  FileTextOutlined,
+  WalletOutlined
 } from '@ant-design/icons';
+import { Modal, Tag } from 'antd';
 
 export default function AdminOrders() {
   const { token } = useSelector(state => state.auth);
@@ -36,6 +42,8 @@ export default function AdminOrders() {
   const [pageSize, setPageSize] = useState(20);
   const [totalOrders, setTotalOrders] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   const fetchRestaurants = async () => {
     try {
@@ -150,6 +158,11 @@ export default function AdminOrders() {
     { value: '', label: 'All Years' },
     ...Array.from({ length: 5 }, (_, i) => ({ value: currentYear - i, label: currentYear - i }))
   ];
+
+  const showOrderDetail = (order) => {
+    setSelectedOrder(order);
+    setIsModalVisible(true);
+  };
 
   return (
     <div className="animate-fade-in max-w-6xl mx-auto p-4 md:p-0">
@@ -301,6 +314,7 @@ export default function AdminOrders() {
                   <th className="p-8">Customer</th>
                   <th className="p-8">Financials</th>
                   <th className="p-8">Live Status</th>
+                  <th className="p-8 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -344,6 +358,16 @@ export default function AdminOrders() {
 
                     <td className="p-8">
                       {getStatusBadge(order.status)}
+                    </td>
+
+                    <td className="p-8 text-right">
+                      <button 
+                        onClick={() => showOrderDetail(order)}
+                        className="p-3 bg-primary/10 text-primary rounded-xl hover:bg-primary hover:text-white transition-all duration-300 shadow-sm border border-primary/5"
+                        title="View Details"
+                      >
+                        <EyeOutlined className="text-lg" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -403,6 +427,266 @@ export default function AdminOrders() {
           </div>
         )}
       </div>
+
+      {/* Order Detail Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-3 py-2">
+            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary border border-primary/10">
+              <FileTextOutlined className="text-lg" />
+            </div>
+            <div>
+              <div className="text-gray-900 font-black text-lg leading-tight uppercase tracking-tight">
+                Order #{selectedOrder?.id?.slice(0, 8).toUpperCase()}
+              </div>
+              <div className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">
+                {selectedOrder && new Date(selectedOrder.created_at).toLocaleString('en-GB', { 
+                  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+                })}
+              </div>
+            </div>
+          </div>
+        }
+        open={isModalVisible}
+        onCancel={() => setIsModalVisible(false)}
+        footer={null}
+        width={800}
+        centered
+        className="premium-modal"
+        styles={{ 
+          body: { padding: '0px' },
+          mask: { backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.3)' }
+        }}
+      >
+        {selectedOrder && (
+          <div className="animate-in fade-in duration-500">
+            {/* Scrollable container */}
+            <div className="max-h-[80vh] overflow-y-auto p-8 custom-scrollbar">
+              {/* Top Status Bar */}
+              <div className="flex justify-between items-center mb-8 bg-gray-50/80 p-5 rounded-[2rem] border border-gray-100">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Transaction Status</span>
+                  <div className="mt-1">{getStatusBadge(selectedOrder.status)}</div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Payment Method</span>
+                  <div className="mt-1 flex items-center justify-end gap-2 text-sm font-black text-gray-800">
+                    <WalletOutlined className="text-primary" />
+                    {selectedOrder.payment_method?.toUpperCase()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                {/* Customer Section */}
+                <div className="relative">
+                  <div className="bg-blue-50/50 p-6 rounded-[2.5rem] border border-blue-100/50 h-full">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="w-9 h-9 bg-blue-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                        <UserOutlined />
+                      </div>
+                      <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest">Customer Details</h4>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-[10px] text-blue-400 font-black uppercase leading-none mb-1.5">Full Name</div>
+                        <div className="text-sm font-black text-gray-800">{selectedOrder.Customer?.User?.full_name}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-blue-400 font-black uppercase leading-none mb-1.5">Contact Phone</div>
+                        <div className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                          <PhoneOutlined className="text-blue-300" />
+                          {selectedOrder.Customer?.User?.phone_number || 'N/A'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-blue-400 font-black uppercase leading-none mb-1.5">Delivery Address</div>
+                        <div className="text-sm font-bold text-gray-700 leading-relaxed flex items-start gap-2">
+                          <EnvironmentOutlined className="text-blue-300 mt-0.5" />
+                          <span>
+                            {selectedOrder.Address?.label ? `[${selectedOrder.Address.label}] ` : ''}
+                            {selectedOrder.Address?.street}, {selectedOrder.Address?.city}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Restaurant Section */}
+                <div>
+                  <div className="bg-orange-50/50 p-6 rounded-[2.5rem] border border-orange-100/50 h-full">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="w-9 h-9 bg-orange-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-orange-200">
+                        <ShopOutlined />
+                      </div>
+                      <h4 className="text-xs font-black text-orange-900 uppercase tracking-widest">Restaurant Partner</h4>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-[10px] text-orange-400 font-black uppercase leading-none mb-1.5">Station Name</div>
+                        <div className="text-sm font-black text-gray-800">{selectedOrder.Restaurant?.name}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-orange-400 font-black uppercase leading-none mb-1.5">Merchant Phone</div>
+                        <div className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                          <PhoneOutlined className="text-orange-300" />
+                          {selectedOrder.Restaurant?.User?.phone_number || 'N/A'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-orange-400 font-black uppercase leading-none mb-1.5">Pickup Location</div>
+                        <div className="text-sm font-bold text-gray-700 leading-relaxed flex items-start gap-2">
+                          <EnvironmentOutlined className="text-orange-300 mt-0.5" />
+                          {selectedOrder.Restaurant?.location}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery Driver Section */}
+              <div className="mb-8 relative overflow-hidden">
+                <div className={`p-6 rounded-[2.5rem] border transition-all ${selectedOrder.DeliveryPartner ? 'bg-teal-50/50 border-teal-100/50' : 'bg-gray-50/50 border-gray-200 border-dashed shadow-inner'}`}>
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-white shadow-lg ${selectedOrder.DeliveryPartner ? 'bg-teal-500 shadow-teal-200' : 'bg-gray-300'}`}>
+                      <CarOutlined />
+                    </div>
+                    <h4 className={`text-xs font-black uppercase tracking-widest ${selectedOrder.DeliveryPartner ? 'text-teal-900' : 'text-gray-500'}`}>Logistics Agent</h4>
+                    {!selectedOrder.DeliveryPartner && (
+                      <span className="text-[9px] bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full font-black uppercase ml-2 animate-pulse">Unassigned</span>
+                    )}
+                  </div>
+
+                  {selectedOrder.DeliveryPartner ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <div className="text-[10px] text-teal-400 font-black uppercase leading-none mb-1.5">Driver Name</div>
+                        <div className="text-sm font-black text-gray-800">{selectedOrder.DeliveryPartner?.User?.full_name}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-teal-400 font-black uppercase leading-none mb-1.5">Agent Phone</div>
+                        <div className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                          <PhoneOutlined className="text-teal-300" />
+                          {selectedOrder.DeliveryPartner?.User?.phone_number || 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-4 text-center">
+                      <p className="text-sm text-gray-400 font-medium">No driver has been assigned to this order yet.</p>
+                      <div className="flex justify-center gap-1 mt-2">
+                         <div className="w-1 h-1 bg-gray-200 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                         <div className="w-1 h-1 bg-gray-200 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                         <div className="w-1 h-1 bg-gray-200 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Order Items Section */}
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-6 ml-1">
+                  <div className="w-1 h-5 bg-primary rounded-full"></div>
+                  <h4 className="text-xs font-black text-gray-800 uppercase tracking-[0.2em]">Purchase Details</h4>
+                </div>
+                
+                <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-50/50 border-b border-gray-50">
+                      <tr>
+                        <th className="px-6 py-4 text-[10px] text-gray-400 font-black uppercase tracking-widest">Menu Item</th>
+                        <th className="px-6 py-4 text-[10px] text-gray-400 font-black uppercase tracking-widest text-center">Qty</th>
+                        <th className="px-6 py-4 text-[10px] text-gray-400 font-black uppercase tracking-widest text-right">Price</th>
+                        <th className="px-6 py-4 text-[10px] text-gray-400 font-black uppercase tracking-widest text-right">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {selectedOrder.OrderItems?.map((item) => (
+                        <tr key={item.id}>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              {item.MenuItem?.image_url ? (
+                                <img src={item.MenuItem.image_url} alt={item.MenuItem.name} className="w-10 h-10 rounded-lg object-cover border border-gray-100" />
+                              ) : (
+                                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-300">
+                                  <ShopOutlined />
+                                </div>
+                              )}
+                              <span className="text-sm font-bold text-gray-700">{item.MenuItem?.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="bg-gray-100 px-2 py-1 rounded-lg text-xs font-black text-gray-600">x{item.quantity}</span>
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm text-gray-500 font-medium">
+                            {Number(item.MenuItem?.price).toLocaleString()}đ
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-black text-gray-900">
+                            {Number(item.subtotal).toLocaleString()}đ
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Financial Summary */}
+              <div className="bg-gray-900 text-white p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-8 opacity-10 rotate-12 transition-transform group-hover:scale-110">
+                  <WalletOutlined className="text-8xl" />
+                </div>
+                
+                <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center text-gray-400">
+                      <span className="text-xs font-bold uppercase tracking-widest">Cart Subtotal</span>
+                      <span className="font-mono">{Number(selectedOrder.subtotal).toLocaleString()}đ</span>
+                    </div>
+                    <div className="flex justify-between items-center text-gray-400">
+                      <span className="text-xs font-bold uppercase tracking-widest">Delivery Fee</span>
+                      <span className="font-mono">{Number(selectedOrder.delivery_fee).toLocaleString()}đ</span>
+                    </div>
+                    <div className="h-px bg-white/10 my-4"></div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-black uppercase tracking-widest text-primary">Master Total</span>
+                      <span className="text-2xl font-black tracking-tighter text-white">
+                        {Number(selectedOrder.total_amount).toLocaleString()}đ
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-3">
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-500 rounded-xl flex items-center justify-center text-white text-xs">
+                          <CheckCircleOutlined />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1">Payment Status</p>
+                          <p className="text-sm font-black text-white uppercase">{selectedOrder.payment_status || 'PAID'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => setIsModalVisible(false)}
+                      className="w-full bg-white text-gray-900 font-black uppercase tracking-widest py-3 rounded-2xl hover:bg-primary hover:text-white transition-all transform active:scale-95"
+                    >
+                      Close Report
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
