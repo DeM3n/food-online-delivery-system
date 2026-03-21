@@ -155,157 +155,91 @@ class OrderService {
     }
 
     // Replace the existing createOrder method with this version.
+    // Updated createOrder method using the Builder Pattern
     async createOrder(userId, orderData, io, req) {
-      const {
-        restaurant_id,
-        items = [],
-        delivery_fee,
-        delivery_address_id,
-        notes,
-        payment_method,
-        force_proceed = false,
-      } = orderData;
-    
-      const paymentMethod = String(payment_method || 'cod').toLowerCase();
-    
-      // Online payment path: do NOT create order here.
-      if (paymentMethod === 'vnpay') {
-        const session = await paymentService.createCheckoutSession({
-          userId,
-          restaurantId: restaurant_id,
-          addressId: delivery_address_id,
-          notes,
-          gatewayName: 'vnpay',
-          ipAddr: paymentService.getClientIp(req),
-        });
-    
-        return {
-          order: null,
-          requiresPayment: true,
-          paymentUrl: session.paymentUrl,
-          txnRef: session.txnRef,
-          amount: session.amount,
-        };
-      }
-    
-      // COD path: keep your current COD implementation below.
-      // ===============================
-      // Begin of existing COD logic
-      // ===============================
-      const t = await sequelize.transaction();
-    
-      try {
-        if (!restaurant_id) throw new Error('restaurant_id is required');
-        if (!Array.isArray(items) || items.length === 0) throw new Error('Order items are required');
-    
-        const customer = await Customer.findOne({ where: { user_id: userId } });
-        if (!customer) throw new Error('Customer not found');
-    
-        const restaurant = await Restaurant.findByPk(restaurant_id);
-        if (!restaurant) throw new Error('Restaurant not found');
-                if (!restaurant.is_open) {
-                    const error = new Error('Restaurant is currently closed');
-                    error.type = 'RESTAURANT_CLOSED';
-                    throw error;
-                }
-    
-        const address = await Address.findOne({
-          where: { id: delivery_address_id, customer_id: customer.id }
-        });
-        if (!address) throw new Error('Delivery address not found');
-    
-        const itemIds = items.map(i => i.menu_item_id || i.id);
-        const dbItems = await MenuItem.findAll({
-          where: { id: { [Op.in]: itemIds }, restaurant_id }
-        });
-    
-        const unavailableItems = dbItems.filter(i => !i.is_available);
-        if (unavailableItems.length > 0 && !force_proceed) {
-          const error = new Error('Some items in your cart are now Out of Order');
-          error.type = 'AVAILABILITY_CONFLICT';
-          error.unavailableItems = unavailableItems.map(i => ({ id: i.id, name: i.name }));
-          throw error;
+        const StandardCheckoutBuilder = require('../builders/checkout/StandardCheckoutBuilder');
+        const CheckoutDirector = require('../builders/checkout/CheckoutDirector');
+
+        const builder = new StandardCheckoutBuilder(userId, orderData);
+        const director = new CheckoutDirector(builder);
+        
+        // Use the director to construct the complex CheckoutRequest object
+        const checkoutRequest = await director.constructRequest();
+
+        // 1. Online payment path (VNPay)
+        if (checkoutRequest.paymentMethod === 'vnpay') {
+            const session = await paymentService.createCheckoutSession({
+                userId,
+                restaurantId: checkoutRequest.restaurantId,
+                addressId: checkoutRequest.addressId,
+                notes: checkoutRequest.notes,
+                gatewayName: 'vnpay',
+                ipAddr: paymentService.getClientIp(req),
+            });
+
+            return {
+                order: null,
+                requiresPayment: true,
+                paymentUrl: session.paymentUrl,
+                txnRef: session.txnRef,
+                amount: session.amount,
+            };
         }
-    
-        const validItems = items.filter(cartItem => {
-          const menuItemId = cartItem.menu_item_id || cartItem.id;
-          const dbItem = dbItems.find(i => i.id === menuItemId);
-          return dbItem && dbItem.is_available;
-        });
-    
-        if (validItems.length === 0) throw new Error('No available items to order');
-    
-        let subtotal = 0;
-        const finalOrderItems = validItems.map(cartItem => {
-          const menuItemId = cartItem.menu_item_id || cartItem.id;
-          const dbItem = dbItems.find(i => i.id === menuItemId);
-          const qty = Number(cartItem.quantity || 0);
-          if (!qty || qty <= 0) throw new Error(`Invalid quantity for item ${dbItem?.name || menuItemId}`);
-    
-          const unitPrice = Number(dbItem.price);
-          const itemSubtotal = unitPrice * qty;
-          subtotal += itemSubtotal;
-    
-          return {
-            menu_item_id: dbItem.id,
-            menu_item_name: dbItem.name,
-            quantity: qty,
-            unit_price: unitPrice,
-            subtotal: itemSubtotal,
-          };
-        });
-    
-        const deliveryFee = Number(delivery_fee || 0);
-        const total_amount = subtotal + deliveryFee;
-    
-        const order = await Order.create({
-          customer_id: customer.id,
-          restaurant_id,
-          delivery_address_id,
-          notes,
-          subtotal,
-          delivery_fee: deliveryFee,
-          total_amount,
-          status: 'pending',
-          payment_status: 'pending',
-          payment_method: 'cod',
-        }, { transaction: t });
-    
-        await OrderItem.bulkCreate(finalOrderItems.map(item => ({
-          order_id: order.id,
-          menu_item_id: item.menu_item_id,
-          menu_item_name: item.menu_item_name,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          subtotal: item.subtotal,
-        })), { transaction: t });
-    
-        await Notification.create({
-          user_id: customer.user_id,
-          type: 'order',
-          title: 'Đặt hàng thành công',
-          message: `Đơn hàng ${order.id} đã được tạo thành công.`
-        }, { transaction: t });
-    
-        await t.commit();
-    
-        const fullOrder = await Order.findByPk(order.id, {
-          include: [
-            { model: OrderItem, include: [{ model: MenuItem }] },
-            { model: Restaurant, attributes: ['id', 'name'] },
-            { model: Address, attributes: ['id', 'street', 'city'] }
-          ]
-        });
-    
-        return {
-          order: fullOrder,
-          requiresPayment: false,
-          paymentUrl: null,
-        };
-      } catch (error) {
-        if (t && !t.finished) await t.rollback();
-        throw error;
-      }
+
+        // 2. COD path: Proceed with database records creation
+        const t = await sequelize.transaction();
+
+        try {
+            const order = await Order.create({
+                customer_id: checkoutRequest.customerId,
+                restaurant_id: checkoutRequest.restaurantId,
+                delivery_address_id: checkoutRequest.addressId,
+                notes: checkoutRequest.notes,
+                subtotal: checkoutRequest.subtotal,
+                delivery_fee: checkoutRequest.deliveryFee,
+                total_amount: checkoutRequest.totalAmount,
+                status: 'pending',
+                payment_status: 'pending',
+                payment_method: 'cod',
+            }, { transaction: t });
+
+            const finalOrderItems = checkoutRequest.finalOrderItems.map(item => ({
+                order_id: order.id,
+                menu_item_id: item.menu_item_id,
+                menu_item_name: item.menu_item_name,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                subtotal: item.subtotal,
+            }));
+
+            await OrderItem.bulkCreate(finalOrderItems, { transaction: t });
+
+            await Notification.create({
+                user_id: userId,
+                type: 'order',
+                title: 'Đặt hàng thành công',
+                message: `Đơn hàng ${order.id} đã được tạo thành công.`
+            }, { transaction: t });
+
+            await t.commit();
+
+            const fullOrder = await Order.findByPk(order.id, {
+                include: [
+                    { model: OrderItem, include: [{ model: MenuItem }] },
+                    { model: Restaurant, attributes: ['id', 'name'] },
+                    { model: Address, attributes: ['id', 'street', 'city'] }
+                ]
+            });
+
+            return {
+                order: fullOrder,
+                requiresPayment: false,
+                paymentUrl: null,
+            };
+        } catch (error) {
+            if (t && !t.finished) await t.rollback();
+            throw error;
+        }
     }
     
     
