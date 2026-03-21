@@ -269,10 +269,8 @@ class FulfillmentService {
             throw new Error('Not authorized to cancel this order');
         }
 
-        const allowedStatuses = ['pending', 'accepted'];
-        if (!allowedStatuses.includes(order.status)) {
-            throw new Error(`Cannot cancel order in ${order.status} status.`);
-        }
+        const stateContext = new OrderStatusContext(order.status);
+        stateContext.transitionTo('cancelled'); // State Pattern sẽ tự ném lỗi nếu không được phép
 
         let refund = {
             refunded: false,
@@ -298,10 +296,10 @@ class FulfillmentService {
         }
 
         if (refund.refundResponseCode === '99') {
-            order.status = 'cancelled';
+            order.status = stateContext.getCurrentStatus(); // Lấy từ State Pattern thay vì gán cứng
             order.payment_status = 'refunded';
         } else {
-            order.status = 'cancelled';
+            order.status = stateContext.getCurrentStatus(); // Lấy từ State Pattern thay vì gán cứng
             order.payment_status = 'cancelled';
         }
 

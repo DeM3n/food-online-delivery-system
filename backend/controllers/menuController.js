@@ -1,4 +1,8 @@
 const menuService = require('../services/menuService');
+const restaurantPortal = require('../commands/RestaurantPortal');
+const AddMenuItemCommand = require('../commands/AddMenuItemCommand');
+const UpdateMenuItemCommand = require('../commands/UpdateMenuItemCommand');
+const ToggleAvailabilityCommand = require('../commands/ToggleAvailabilityCommand');
 
 // @desc    Get categories for a restaurant
 // @route   GET /api/menu/categories/:restaurantId
@@ -41,7 +45,8 @@ exports.getFullMenu = async (req, res) => {
 // @route   POST /api/menu
 exports.createMenuItem = async (req, res) => {
     try {
-        const item = await menuService.createMenuItem(req.user.id, req.body);
+        const command = new AddMenuItemCommand(menuService, req.user.id, req.body);
+        const item = await restaurantPortal.submitCommand(command);
         res.status(201).json({ success: true, data: item });
     } catch (error) {
         console.error(error);
@@ -53,7 +58,8 @@ exports.createMenuItem = async (req, res) => {
 // @route   PUT /api/menu/:id
 exports.updateMenuItem = async (req, res) => {
     try {
-        const item = await menuService.updateMenuItem(req.params.id, req.user.id, req.body, req.io);
+        const command = new UpdateMenuItemCommand(menuService, req.params.id, req.user.id, req.body, req.io);
+        const item = await restaurantPortal.submitCommand(command);
         res.json({ success: true, data: item });
     } catch (error) {
         console.error(error);
@@ -65,7 +71,8 @@ exports.updateMenuItem = async (req, res) => {
 // @route   PATCH /api/menu/:id/toggle-availability
 exports.toggleAvailability = async (req, res) => {
     try {
-        const item = await menuService.toggleAvailability(req.params.id, req.user.id, req.io);
+        const command = new ToggleAvailabilityCommand(menuService, req.params.id, req.user.id, req.io);
+        const item = await restaurantPortal.submitCommand(command);
         res.json({ success: true, data: item });
     } catch (error) {
         console.error(error);

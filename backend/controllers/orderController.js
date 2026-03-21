@@ -2,6 +2,10 @@ const fulfillmentService = require('../services/fulfillment/fulfillmentService')
 const restaurantOpsService = require('../services/restaurant_ops/restaurantOpsService');
 const deliveryMgmtService = require('../services/delivery_mgmt/deliveryMgmtService');
 const paymentService = require('../services/paymentService');
+const restaurantPortal = require('../commands/RestaurantPortal');
+const AcceptOrderCommand = require('../commands/AcceptOrderCommand');
+const RejectOrderCommand = require('../commands/RejectOrderCommand');
+const MarkReadyCommand = require('../commands/MarkReadyCommand');
 
 // @desc    Get restaurant orders
 // @route   GET /api/orders/restaurant/me
@@ -24,7 +28,21 @@ exports.getRestaurantOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { status } = req.body;
-        const order = await fulfillmentService.updateStatus(req.params.id, status, req.user, req.io);
+        let order;
+        
+        if (status === 'accepted') {
+            const command = new AcceptOrderCommand(fulfillmentService, req.params.id, req.user, req.io);
+            order = await restaurantPortal.submitCommand(command);
+        } else if (status === 'cancelled') {
+            const command = new RejectOrderCommand(fulfillmentService, req.params.id, req.user, req.io);
+            order = await restaurantPortal.submitCommand(command);
+        } else if (status === 'preparing') {
+            const command = new MarkReadyCommand(fulfillmentService, req.params.id, req.user, req.io);
+            order = await restaurantPortal.submitCommand(command);
+        } else {
+            order = await fulfillmentService.updateStatus(req.params.id, status, req.user, req.io);
+        }
+        
         res.json({ success: true, data: order });
     } catch (error) {
         console.error(error);

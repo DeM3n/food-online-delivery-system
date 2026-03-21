@@ -1,6 +1,7 @@
 const { User, Restaurant, Customer, DeliveryPartner, Order, OrderItem, MenuItem, Address, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { sendPendingApprovalStatusEmail } = require('./mailService');
+const OrderFilterChain = require('../chains/order_filters/OrderFilterChain');
 
 class AdminService {
     mapPendingApprovalItem(user) {
@@ -131,32 +132,11 @@ class AdminService {
     }
 
     async getAllOrders(restaurantId, statusFilter, page = 1, limit = 20, month, year) {
-        const where = {};
-        if (restaurantId) {
-            where.restaurant_id = restaurantId;
-        }
-        
-        if (statusFilter && statusFilter !== 'all') {
-            if (statusFilter === 'delivered') {
-                where.status = { [Op.in]: ['delivered', 'completed'] };
-            } else {
-                where.status = statusFilter;
-            }
-        }
+        const context = OrderFilterChain.buildContext({
+            restaurantId, statusFilter, page, limit, month, year
+        });
 
-        if (month && year) {
-            const startOfMonth = new Date(year, month - 1, 1);
-            const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
-            where.created_at = { [Op.between]: [startOfMonth, endOfMonth] };
-        } else if (year) {
-            const startOfYear = new Date(year, 0, 1);
-            const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999);
-            where.created_at = { [Op.between]: [startOfYear, endOfYear] };
-        }
-
-        const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
-        const parsedLimit = Math.max(parseInt(limit, 10) || 20, 1);
-        const offset = (parsedPage - 1) * parsedLimit;
+        const { where, countWhere, pagination } = context;
 
         const { count: total, rows: orders } = await Order.findAndCountAll({
             where,
@@ -183,15 +163,12 @@ class AdminService {
                     attributes: ['street', 'city', 'label']
                 }
             ],
-            limit: parsedLimit,
-            offset,
+            limit: pagination.limit,
+            offset: pagination.offset,
             order: [['created_at', 'DESC']]
         });
 
-        // Get counts for each status
-        const countWhere = { ...where };
-        // Remove status from countWhere as we need counts for all statuses
-        delete countWhere.status;
+        // Get counts for each status using countWhere which is unaffected by status filtering
 
         const statusCounts = await Order.findAll({
             attributes: ['status', [sequelize.fn('COUNT', sequelize.col('status')), 'count']],
@@ -223,9 +200,9 @@ class AdminService {
             counts,
             pagination: {
                 total,
-                page: parsedPage,
-                limit: parsedLimit,
-                totalPages: Math.max(Math.ceil(total / parsedLimit), 1)
+                page: pagination.page,
+                limit: pagination.limit,
+                totalPages: Math.max(Math.ceil(total / pagination.limit), 1)
             }
         };
     }
