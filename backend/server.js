@@ -57,22 +57,22 @@ app.use('/api/payments', paymentRoutes);
 
 // Socket.io Connection Logic
 io.on('connection', (socket) => {
-    console.log('A user connected:', socket.id);
+    console.log('📡 Socket.io: A user connected:', socket.id);
 
     // Join room based on userId for targeted notifications
     socket.on('join', (userId) => {
         socket.join(userId);
-        console.log(`User ${userId} joined their notification room`);
+        console.log(`🏠 Socket.io: User ${userId} joined their notification room (Socket: ${socket.id})`);
     });
 
     // Special room for available deliveries
     socket.on('join_deliveries', () => {
         socket.join('available_deliveries');
-        console.log('User joined available_deliveries room');
+        console.log('🚚 Socket.io: User joined available_deliveries room');
     });
 
-    socket.on('disconnect', () => {
-        console.log('User disconnected');
+    socket.on('disconnect', (reason) => {
+        console.log('🔌 Socket.io: User disconnected. Reason:', reason);
     });
 });
 

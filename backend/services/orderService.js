@@ -289,10 +289,12 @@ class OrderService {
         const statusData = { orderId: order.id, status: order.status };
 
         if (order.Customer && io) {
+            console.log(`📡 Socket.io: Emitting ORDER_STATUS_UPDATED to customer ${order.Customer.user_id}:`, statusData);
             io.to(order.Customer.user_id).emit('ORDER_STATUS_UPDATED', statusData);
         }
-
+    
         if (order.Restaurant && io) {
+            console.log(`📡 Socket.io: Emitting ORDER_STATUS_UPDATED to restaurant ${order.Restaurant.user_id}:`, statusData);
             io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', statusData);
         }
 
