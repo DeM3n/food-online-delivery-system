@@ -1,4 +1,6 @@
-const orderService = require('../services/orderService');
+const fulfillmentService = require('../services/fulfillment/fulfillmentService');
+const restaurantOpsService = require('../services/restaurant_ops/restaurantOpsService');
+const deliveryMgmtService = require('../services/delivery_mgmt/deliveryMgmtService');
 const paymentService = require('../services/paymentService');
 
 // @desc    Get restaurant orders
@@ -7,7 +9,7 @@ const paymentService = require('../services/paymentService');
 exports.getRestaurantOrders = async (req, res) => {
     try {
         const { status, date } = req.query;
-        const result = await orderService.getRestaurantOrders(req.user.id, status, date);
+        const result = await restaurantOpsService.getRestaurantOrders(req.user.id, status, date);
         res.json({ success: true, data: result.orders, counts: result.counts });
     } catch (error) {
         console.error(error);
@@ -22,7 +24,7 @@ exports.getRestaurantOrders = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { status } = req.body;
-        const order = await orderService.updateStatus(req.params.id, status, req.user, req.io);
+        const order = await fulfillmentService.updateStatus(req.params.id, status, req.user, req.io);
         res.json({ success: true, data: order });
     } catch (error) {
         console.error(error);
@@ -38,7 +40,7 @@ exports.updateOrderStatus = async (req, res) => {
 exports.getUserOrders = async (req, res) => {
     try {
         const { date, limit, offset } = req.query;
-        const result = await orderService.getUserOrders(req.user.id, { date, limit, offset });
+        const result = await fulfillmentService.getUserOrders(req.user.id, { date, limit, offset });
         res.json({ success: true, data: result.orders, total: result.total, confirmedCount: result.confirmedCount });
     } catch (error) {
         console.error(error);
@@ -52,7 +54,7 @@ exports.getUserOrders = async (req, res) => {
 // @access  Private
 exports.getMonthlyFavorite = async (req, res) => {
     try {
-        const result = await orderService.getMonthlyFavorite(req.user.id);
+        const result = await fulfillmentService.getMonthlyFavorite(req.user.id);
         res.json({ success: true, data: result });
     } catch (error) {
         console.error('Error in getMonthlyFavorite:', error);
@@ -64,25 +66,9 @@ exports.getMonthlyFavorite = async (req, res) => {
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Private
-// exports.createOrder = async (req, res) => {
-//     try {
-//         const order = await orderService.createOrder(req.user.id, req.body, req.io);
-//         res.status(201).json({ success: true, data: order });
-//     } catch (error) {
-//         console.error(error);
-//         const statusCode = error.message.includes('not found') ? 404 : 
-//                            (error.type === 'AVAILABILITY_CONFLICT') ? 400 : 500;
-//         res.status(statusCode).json({ 
-//             success: false, 
-//             message: error.message,
-//             type: error.type,
-//             unavailableItems: error.unavailableItems
-//         });
-//     }
-// };
 exports.createOrder = async (req, res) => {
   try {
-    const result = await orderService.createOrder(req.user.id, req.body, req.io, req);
+    const result = await fulfillmentService.createOrder(req.user.id, req.body, req.io, req);
 
     res.status(201).json({
       success: true,
@@ -114,7 +100,7 @@ exports.createOrder = async (req, res) => {
 // @access  Private
 exports.getAvailableDeliveries = async (req, res) => {
     try {
-        const orders = await orderService.getAvailableDeliveries();
+        const orders = await deliveryMgmtService.getAvailableDeliveries();
         res.json({ success: true, data: orders });
     } catch (error) {
         console.error(error);
@@ -125,7 +111,7 @@ exports.getAvailableDeliveries = async (req, res) => {
 exports.acceptDelivery = async (req, res) => {
     try {
         const { driver_id } = req.body;
-        const order = await orderService.acceptByDriver(req.params.id, driver_id, req.io);
+        const order = await deliveryMgmtService.acceptByDriver(req.params.id, driver_id, req.io);
         res.json({ success: true, data: order });
     } catch (error) {
         console.error(error);
@@ -139,7 +125,7 @@ exports.acceptDelivery = async (req, res) => {
 // @access  Private
 exports.getDriverDeliveries = async (req, res) => {
     try {
-        const orders = await orderService.getDriverDeliveries(req.user.id);
+        const orders = await deliveryMgmtService.getDriverDeliveries(req.user.id);
         res.json({ success: true, data: orders });
     } catch (error) {
         console.error(error);
@@ -153,7 +139,7 @@ exports.getDriverDeliveries = async (req, res) => {
 // @access  Private
 exports.getDriverHistory = async (req, res) => {
     try {
-        const orders = await orderService.getDriverHistory(req.user.id);
+        const orders = await deliveryMgmtService.getDriverHistory(req.user.id);
         res.json({ success: true, data: orders });
     } catch (error) {
         console.error(error);
@@ -168,7 +154,7 @@ exports.getDriverHistory = async (req, res) => {
 exports.getRestaurantYearlySummary = async (req, res) => {
     try {
         const { year } = req.query;
-        const data = await orderService.getRestaurantYearlySummary(req.user.id, year);
+        const data = await restaurantOpsService.getRestaurantYearlySummary(req.user.id, year);
         res.json({ success: true, data });
     } catch (error) {
         console.error(error);
@@ -182,7 +168,7 @@ exports.getRestaurantYearlySummary = async (req, res) => {
 // @access  Private
 exports.cancelOrder = async (req, res) => {
     try {
-        const result = await orderService.cancelOrder(req.params.id, req.user.id, req.io, req);
+        const result = await fulfillmentService.cancelOrder(req.params.id, req.user.id, req.io, req);
 
         res.json({
           success: true,

@@ -130,7 +130,7 @@ class OrderStatusContext {
 
 const ROLE_ALLOWED_TARGETS = {
   customer: ['completed'],
-  restaurant: ['accepted', 'preparing'],
+  restaurant: ['accepted', 'preparing', 'cancelled'],
   delivery_partner: ['delivered'],
 };
 
@@ -153,7 +153,7 @@ function assertRoleCanUpdateStatus({ role, targetStatus }) {
     }
 
     if (normalizedRole === 'restaurant') {
-      throw new Error('Restaurants can only move orders to accepted or preparing');
+      throw new Error('Restaurants can only move orders to accepted, preparing, or cancelled');
     }
 
     throw new Error('Not authorized to update this order');
