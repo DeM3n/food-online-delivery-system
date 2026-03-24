@@ -15,6 +15,7 @@ exports.registerUser = async (req, res) => {
         full_name: result.user.full_name,
         phone_number: result.user.phone_number,
         token: result.token,
+        account_state: result.accountState,
         profile: result.profile
       }
     });
@@ -41,6 +42,7 @@ exports.loginUser = async (req, res) => {
         full_name: result.user.full_name,
         phone_number: result.user.phone_number,
         token: result.token,
+        account_state: result.accountState,
         profile: result.profile
       }
     });
@@ -48,7 +50,8 @@ exports.loginUser = async (req, res) => {
     console.error(error);
     const statusCode =
       error.message === 'Invalid email or password' ? 401 :
-      error.message.includes('pending admin approval') ? 403 : 500;
+      error.message.includes('pending admin approval') ? 403 :
+      error.message.includes('deactivated') ? 403 : 500;
     res.status(statusCode).json({ success: false, message: error.message });
   }
 };

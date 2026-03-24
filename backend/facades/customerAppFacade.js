@@ -6,10 +6,8 @@ const orderController = require('../controllers/orderController');
 /**
  * CustomerAppFacade
  *
- * Facade layer for the Customer Web/App subsystem.
- * This matches the report structure:
  * CustomerView -> CustomerAppFacade -> AuthController / CatalogController /
- * CartController / OrderController.
+ * CartController / OrderController
  */
 class CustomerAppFacade {
   authenticateUser(req, res) {
@@ -18,6 +16,10 @@ class CustomerAppFacade {
 
   browseCatalog(req, res) {
     return catalogController.browseCatalog(req, res);
+  }
+
+  searchCatalog(req, res) {
+    return catalogController.searchCatalog(req, res);
   }
 
   getProductDetail(req, res) {

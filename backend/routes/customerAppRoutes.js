@@ -3,9 +3,9 @@ const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 const customerViewController = require('../controllers/customerViewController');
 
-
 router.post('/login', customerViewController.login);
 router.get('/catalog', customerViewController.browseCatalog);
+router.get('/catalog/search', customerViewController.searchCatalog);
 router.get('/catalog/:itemId', customerViewController.getProductDetail);
 router.get('/cart', protect, customerViewController.getCart);
 router.post('/cart/items', protect, customerViewController.addToCart);
