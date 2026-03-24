@@ -14,12 +14,13 @@ const {
 } = require('../models');
 const PaymentGatewayFactory = require('../factories/paymentGatewayFactory');
 const { sendRefundEmail } = require('./mailService');
+const PaymentRequest = require('./order_payment/models/PaymentRequest');
+const PaymentGatewayStrategyAdapter = require('./order_payment/adapters/PaymentGatewayStrategyAdapter');
 
 const FRONTEND_RETURN_URL =
   process.env.FRONTEND_VNPAY_RETURN_URL || 'http://localhost:5173/payment-result';
 
 class PaymentService {
-
   async refundOrderPayment({ order, ipAddr, createBy = 'system' }) {
     const payment = await Payment.findOne({ where: { order_id: order.id } });
 
@@ -212,7 +213,7 @@ class PaymentService {
     return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
   }
 
-  async createCheckoutSession({
+  async prepareGatewayPayment({
     userId,
     restaurantId,
     addressId,
@@ -287,7 +288,7 @@ class PaymentService {
     const txnRef = this.generateTxnRef(customer.id);
     const gateway = PaymentGatewayFactory.create(gatewayName);
 
-    await Payment.create({
+    const payment = await Payment.create({
       order_id: null,
       customer_id: customer.id,
       restaurant_id: restaurantId,
@@ -304,23 +305,67 @@ class PaymentService {
       status: 'pending',
     });
 
-    const { paymentUrl } = await gateway.initiatePayment({
-      txnRef,
+    const paymentRequest = new PaymentRequest({
+      orderId: null,
+      transactionId: txnRef,
       amount: totalAmount,
+      paymentMethod: gateway.getGatewayName(),
       orderInfo: `Thanh toan don hang ${txnRef}`,
       returnUrl: process.env.VNP_RETURN_URL || 'http://localhost:5001/api/payments/vnpay/return',
       ipAddr,
       locale: process.env.VNP_LOCALE || 'vn',
       createDate,
+      gatewayName: gateway.getGatewayName(),
+      metadata: {
+        paymentId: payment.id,
+        customerId: customer.id,
+        restaurantId,
+        addressId,
+        subtotal,
+        delivery_fee: normalizedDeliveryFee,
+      },
     });
 
     return {
+      paymentId: payment.id,
       txnRef,
-      paymentUrl,
       subtotal,
       delivery_fee: normalizedDeliveryFee,
       amount: totalAmount,
       gateway: gateway.getGatewayName(),
+      paymentRequest,
+    };
+  }
+
+  async createCheckoutSession({
+    userId,
+    restaurantId,
+    addressId,
+    notes,
+    deliveryFee = 0,
+    gatewayName = 'vnpay',
+    ipAddr,
+  }) {
+    const prepared = await this.prepareGatewayPayment({
+      userId,
+      restaurantId,
+      addressId,
+      notes,
+      deliveryFee,
+      gatewayName,
+      ipAddr,
+    });
+
+    const adapter = new PaymentGatewayStrategyAdapter(prepared.gateway);
+    const paymentResult = await adapter.processPayment(prepared.paymentRequest);
+
+    return {
+      txnRef: prepared.txnRef,
+      paymentUrl: paymentResult.paymentUrl,
+      subtotal: prepared.subtotal,
+      delivery_fee: prepared.delivery_fee,
+      amount: prepared.amount,
+      gateway: prepared.gateway,
     };
   }
 
