@@ -6,6 +6,8 @@ const {
     OrderStatusContext,
     assertRoleCanUpdateStatus,
 } = require('../../states/order/orderStatusState');
+module.exports = require('../orderService');
+
 
 /**
  * Interface: IOrderFulfillmentAPI

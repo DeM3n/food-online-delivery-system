@@ -7,9 +7,6 @@ const AcceptOrderCommand = require('../commands/AcceptOrderCommand');
 const RejectOrderCommand = require('../commands/RejectOrderCommand');
 const MarkReadyCommand = require('../commands/MarkReadyCommand');
 
-// @desc    Get restaurant orders
-// @route   GET /api/orders/restaurant/me
-// @access  Private
 exports.getRestaurantOrders = async (req, res) => {
     try {
         const { status, date } = req.query;
@@ -22,14 +19,11 @@ exports.getRestaurantOrders = async (req, res) => {
     }
 };
 
-// @desc    Update order status
-// @route   PUT /api/orders/:id/status
-// @access  Private
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { status } = req.body;
         let order;
-        
+
         if (status === 'accepted') {
             const command = new AcceptOrderCommand(fulfillmentService, req.params.id, req.user, req.io);
             order = await restaurantPortal.submitCommand(command);
@@ -42,19 +36,16 @@ exports.updateOrderStatus = async (req, res) => {
         } else {
             order = await fulfillmentService.updateStatus(req.params.id, status, req.user, req.io);
         }
-        
+
         res.json({ success: true, data: order });
     } catch (error) {
         console.error(error);
-        const statusCode = (error.message.includes('not found')) ? 404 : 
+        const statusCode = (error.message.includes('not found')) ? 404 :
                            (error.message.includes('Not authorized')) ? 403 : 400;
         res.status(statusCode).json({ success: false, message: error.message });
     }
 };
 
-// @desc    Get user orders
-// @route   GET /api/orders/me
-// @access  Private
 exports.getUserOrders = async (req, res) => {
     try {
         const { date, limit, offset } = req.query;
@@ -67,9 +58,6 @@ exports.getUserOrders = async (req, res) => {
     }
 };
 
-// @desc    Get monthly favorite food for user
-// @route   GET /api/orders/me/favorite
-// @access  Private
 exports.getMonthlyFavorite = async (req, res) => {
     try {
         const result = await fulfillmentService.getMonthlyFavorite(req.user.id);
@@ -81,9 +69,6 @@ exports.getMonthlyFavorite = async (req, res) => {
     }
 };
 
-// @desc    Create new order
-// @route   POST /api/orders
-// @access  Private
 exports.createOrder = async (req, res) => {
   try {
     const result = await fulfillmentService.createOrder(req.user.id, req.body, req.io, req);
@@ -93,14 +78,19 @@ exports.createOrder = async (req, res) => {
       data: result.order,
       requiresPayment: result.requiresPayment,
       paymentUrl: result.paymentUrl,
+      txnRef: result.txnRef,
+      amount: result.amount,
+      gateway: result.gateway,
     });
   } catch (error) {
     console.error(error);
     const statusCode = error.message.includes('not found')
       ? 404
-            : error.type === 'RESTAURANT_CLOSED'
-            ? 400
+      : error.type === 'RESTAURANT_CLOSED'
+      ? 400
       : error.type === 'AVAILABILITY_CONFLICT'
+      ? 400
+      : error.message.includes('Unsupported payment method')
       ? 400
       : 500;
 
@@ -113,9 +103,6 @@ exports.createOrder = async (req, res) => {
   }
 };
 
-// @desc    Get available deliveries for drivers
-// @route   GET /api/orders/deliveries/available
-// @access  Private
 exports.getAvailableDeliveries = async (req, res) => {
     try {
         const orders = await deliveryMgmtService.getAvailableDeliveries();
@@ -138,9 +125,6 @@ exports.acceptDelivery = async (req, res) => {
     }
 };
 
-// @desc    Get deliveries assigned to driver
-// @route   GET /api/orders/driver/me
-// @access  Private
 exports.getDriverDeliveries = async (req, res) => {
     try {
         const orders = await deliveryMgmtService.getDriverDeliveries(req.user.id);
@@ -152,9 +136,6 @@ exports.getDriverDeliveries = async (req, res) => {
     }
 };
 
-// @desc    Get deliveries history for driver
-// @route   GET /api/orders/driver/me/history
-// @access  Private
 exports.getDriverHistory = async (req, res) => {
     try {
         const orders = await deliveryMgmtService.getDriverHistory(req.user.id);
@@ -166,9 +147,6 @@ exports.getDriverHistory = async (req, res) => {
     }
 };
 
-// @desc    Get yearly summary for restaurant
-// @route   GET /api/orders/restaurant/me/yearly-summary
-// @access  Private
 exports.getRestaurantYearlySummary = async (req, res) => {
     try {
         const { year } = req.query;
@@ -181,9 +159,6 @@ exports.getRestaurantYearlySummary = async (req, res) => {
     }
 };
 
-// @desc    Cancel order (Customer)
-// @route   PUT /api/orders/:id/cancel
-// @access  Private
 exports.cancelOrder = async (req, res) => {
     try {
         const result = await fulfillmentService.cancelOrder(req.params.id, req.user.id, req.io, req);
@@ -198,7 +173,7 @@ exports.cancelOrder = async (req, res) => {
         });
     } catch (error) {
         console.error(error);
-        const statusCode = (error.message.includes('not found')) ? 404 : 
+        const statusCode = (error.message.includes('not found')) ? 404 :
                            (error.message.includes('Not authorized')) ? 403 : 400;
         res.status(statusCode).json({ success: false, message: error.message });
     }

@@ -13,7 +13,7 @@ const {
   User,
 } = require('../models');
 const PaymentGatewayFactory = require('../factories/paymentGatewayFactory');
-const { sendRefundEmail } = require('./mailService');
+const notificationService = require('./notification_integration/NotificationService');
 
 const FRONTEND_RETURN_URL =
   process.env.FRONTEND_VNPAY_RETURN_URL || 'http://localhost:5173/payment-result';
@@ -136,21 +136,29 @@ class PaymentService {
         message: `Đơn hàng ${order.id} đã được hoàn tiền thành công.`,
       });
 
-      if (customerEmail) {
-        try {
-          await sendRefundEmail({
-            to: customerEmail,
-            customerName,
-            orderId: order.id,
-            refundAmount: payment.refund_amount,
-            gatewayName: gateway.getGatewayName().toUpperCase(),
-            status: 'success',
-            refundMessage: refundResult.message,
-          });
-        } catch (mailError) {
-          console.error('Send refund success email failed:', mailError);
-        }
-      }
+      await notificationService.notifyMany([
+        customerEmail ? {
+          channel: 'email',
+          recipient: customerEmail,
+          orderId: order.id,
+          subject: 'Hoàn tiền đơn hàng thành công',
+          content: refundResult.message,
+          status: 'refunded',
+          customerName,
+          refundAmount: payment.refund_amount,
+          gatewayName: gateway.getGatewayName().toUpperCase(),
+        } : null,
+        hydratedOrder?.Customer?.user_id ? {
+          channel: 'push',
+          recipient: hydratedOrder.Customer.user_id,
+          orderId: order.id,
+          subject: 'Hoàn tiền đơn hàng thành công',
+          content: `Đơn hàng ${order.id} đã được hoàn tiền thành công.`,
+          status: 'refunded',
+        } : null,
+      ].filter(Boolean)).catch((notifyError) => {
+        console.error('Send refund success notification failed:', notifyError);
+      });
 
       return {
         refunded: true,
@@ -164,21 +172,29 @@ class PaymentService {
     payment.refund_status = 'failed';
     await payment.save();
 
-    if (customerEmail) {
-      try {
-        await sendRefundEmail({
-          to: customerEmail,
-          customerName,
-          orderId: order.id,
-          refundAmount: payment.refund_amount,
-          gatewayName: gateway.getGatewayName().toUpperCase(),
-          status: 'failed',
-          refundMessage: refundResult.message,
-        });
-      } catch (mailError) {
-        console.error('Send refund failed email failed:', mailError);
-      }
-    }
+    await notificationService.notifyMany([
+      customerEmail ? {
+        channel: 'email',
+        recipient: customerEmail,
+        orderId: order.id,
+        subject: 'Cập nhật hoàn tiền đơn hàng',
+        content: refundResult.message,
+        status: 'refund_failed',
+        customerName,
+        refundAmount: payment.refund_amount,
+        gatewayName: gateway.getGatewayName().toUpperCase(),
+      } : null,
+      hydratedOrder?.Customer?.user_id ? {
+        channel: 'push',
+        recipient: hydratedOrder.Customer.user_id,
+        orderId: order.id,
+        subject: 'Cập nhật hoàn tiền đơn hàng',
+        content: refundResult.message,
+        status: 'refund_failed',
+      } : null,
+    ].filter(Boolean)).catch((notifyError) => {
+      console.error('Send refund failed notification failed:', notifyError);
+    });
 
     return {
       refunded: false,
@@ -456,10 +472,43 @@ class PaymentService {
 
       await transaction.commit();
 
-      io?.to(payment.customer_id).emit('payment_success', {
-        orderId: order.id,
-        transactionId: payment.transaction_id,
-        bankCode: result.bankCode,
+      const hydratedCustomer = await Customer.findByPk(payment.customer_id, {
+        attributes: ['id', 'user_id'],
+        include: [{ model: User, attributes: ['email', 'full_name'] }],
+      });
+
+      const customerSocketId = hydratedCustomer?.user_id;
+      const customerEmail = hydratedCustomer?.User?.email;
+      const customerName = hydratedCustomer?.User?.full_name;
+
+      await notificationService.notifyMany([
+        customerSocketId ? {
+          channel: 'push',
+          recipient: customerSocketId,
+          io,
+          orderId: order.id,
+          subject: 'Thanh toán thành công',
+          content: `Đơn hàng ${order.id} đã được thanh toán thành công.`,
+          status: 'paid',
+          pushEvent: 'payment_success',
+          payload: {
+            orderId: order.id,
+            transactionId: payment.transaction_id,
+            bankCode: result.bankCode,
+          },
+        } : null,
+        customerEmail ? {
+          channel: 'email',
+          recipient: customerEmail,
+          orderId: order.id,
+          subject: 'Thanh toán thành công',
+          content: `Đơn hàng ${order.id} đã được thanh toán qua ${gateway.getGatewayName().toUpperCase()}.`,
+          status: 'paid',
+          customerName,
+          gatewayName: gateway.getGatewayName().toUpperCase(),
+        } : null,
+      ].filter(Boolean)).catch((notifyError) => {
+        console.error('Payment success notification failed:', notifyError);
       });
 
       return {

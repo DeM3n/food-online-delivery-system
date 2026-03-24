@@ -2,7 +2,7 @@ const { Order, Customer, Restaurant, DeliveryPartner, User, OrderItem, Address, 
 const { Op } = require('sequelize');
 const paymentService = require('./paymentService');
 const { Payment } = require('../models');
-const { sendDeliveredOrderEmail } = require('./mailService');   
+const notificationService = require('./notification_integration/NotificationService');
 const {
     OrderStatusContext,
     assertRoleCanUpdateStatus,
@@ -227,9 +227,42 @@ class OrderService {
                 include: [
                     { model: OrderItem, include: [{ model: MenuItem }] },
                     { model: Restaurant, attributes: ['id', 'name'] },
-                    { model: Address, attributes: ['id', 'street', 'city'] }
+                    { model: Address, attributes: ['id', 'street', 'city'] },
+                    {
+                        model: Customer,
+                        attributes: ['id', 'user_id'],
+                        include: [{ model: User, attributes: ['email', 'full_name'] }]
+                    }
                 ]
             });
+
+            const customerSocketId = fullOrder?.Customer?.user_id;
+            const customerEmail = fullOrder?.Customer?.User?.email;
+            const customerName = fullOrder?.Customer?.User?.full_name;
+
+            await notificationService.notifyMany([
+                customerSocketId ? {
+                    channel: 'push',
+                    recipient: customerSocketId,
+                    io,
+                    orderId: order.id,
+                    subject: 'Đặt hàng thành công',
+                    content: `Đơn hàng ${order.id} đã được tạo thành công.`,
+                    pushEvent: 'ORDER_CREATED',
+                    payload: {
+                        orderId: order.id,
+                        status: 'pending',
+                    },
+                } : null,
+                customerEmail ? {
+                    channel: 'email',
+                    recipient: customerEmail,
+                    orderId: order.id,
+                    subject: 'Đặt hàng thành công',
+                    content: `Đơn hàng ${order.id} đã được tạo thành công và đang chờ xử lý.`,
+                    customerName,
+                } : null,
+            ].filter(Boolean));
 
             return {
                 order: fullOrder,
@@ -311,23 +344,36 @@ class OrderService {
             });
         }
 
-        // Send delivered email in background so status update is not blocked by SMTP latency.
-        if (oldStatus !== 'delivered' && order.status === 'delivered') {
-            const customerEmail = order.Customer?.User?.email;
-            const customerName = order.Customer?.User?.full_name;
-            const restaurantName = order.Restaurant?.name;
+        const customerSocketId = order.Customer?.user_id;
+        const customerEmail = order.Customer?.User?.email;
+        const customerName = order.Customer?.User?.full_name;
+        const restaurantName = order.Restaurant?.name;
 
-            if (customerEmail) {
-                sendDeliveredOrderEmail({
-                    to: customerEmail,
-                    customerName,
-                    orderId: order.id,
-                    restaurantName,
-                }).catch((mailError) => {
-                    console.error('Send delivered email failed:', mailError);
-                });
-            }
-        }
+        notificationService.notifyMany([
+            customerSocketId ? {
+                channel: 'push',
+                recipient: customerSocketId,
+                io,
+                orderId: order.id,
+                status: order.status,
+                subject: 'Cập nhật giao hàng',
+                content: `Đơn hàng ${order.id} đã chuyển sang trạng thái ${order.status}.`,
+                pushEvent: 'ORDER_STATUS_UPDATED',
+                payload: { orderId: order.id, status: order.status },
+            } : null,
+            oldStatus !== 'delivered' && order.status === 'delivered' && customerEmail ? {
+                channel: 'email',
+                recipient: customerEmail,
+                orderId: order.id,
+                status: 'delivered',
+                subject: 'Đơn hàng đã được giao thành công',
+                content: `Đơn hàng ${order.id} đã được giao thành công.`,
+                customerName,
+                restaurantName,
+            } : null,
+        ].filter(Boolean)).catch((notifyError) => {
+            console.error('Delivery notification failed:', notifyError);
+        });
 
         return order;
     }
