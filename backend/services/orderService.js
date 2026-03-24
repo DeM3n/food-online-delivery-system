@@ -2,8 +2,7 @@ const { Order, Customer, Restaurant, DeliveryPartner, User, OrderItem, Address, 
 const { Op } = require('sequelize');
 const paymentService = require('./paymentService');
 const { Payment } = require('../models');
-const { sendDeliveredOrderEmail } = require('./mailService');
-const OrderFulfillmentCoordinator = require('./order_payment/OrderFulfillmentCoordinator');
+const notificationService = require('./notification_integration/NotificationService');
 const {
     OrderStatusContext,
     assertRoleCanUpdateStatus,
@@ -49,6 +48,7 @@ class OrderService {
             order: [['created_at', 'DESC']]
         });
 
+        // Get counts for each status
         const statusCounts = await Order.findAll({
             attributes: ['status', [sequelize.fn('COUNT', sequelize.col('status')), 'count']],
             where: {
@@ -71,9 +71,9 @@ class OrderService {
 
         statusCounts.forEach(sc => {
             if (sc.status === 'completed') {
-                counts.delivered += parseInt(sc.count, 10);
-            } else if (Object.prototype.hasOwnProperty.call(counts, sc.status)) {
-                counts[sc.status] += parseInt(sc.count, 10);
+                counts.delivered += parseInt(sc.count);
+            } else if (counts.hasOwnProperty(sc.status)) {
+                counts[sc.status] += parseInt(sc.count);
             }
         });
 
@@ -98,14 +98,14 @@ class OrderService {
             include: [
                 { model: Restaurant, attributes: ['name'] },
                 { model: OrderItem, include: [{ model: MenuItem }] },
-                {
-                    model: DeliveryPartner,
-                    include: [{ model: User, attributes: ['full_name', 'phone_number'] }]
+                { 
+                    model: DeliveryPartner, 
+                    include: [{ model: User, attributes: ['full_name', 'phone_number'] }] 
                 }
             ],
             order: [['created_at', 'DESC']],
-            limit: parseInt(limit, 10),
-            offset: parseInt(offset, 10)
+            limit: parseInt(limit),
+            offset: parseInt(offset)
         });
 
         const confirmedCount = await Order.count({
@@ -144,45 +144,138 @@ class OrderService {
             const data = favoriteData[0];
             const restaurant = await Restaurant.findByPk(data.restaurant_id);
             if (restaurant) {
-                return {
+                return { 
                     type: 'restaurant',
-                    ...restaurant.toJSON(),
-                    count: data.count
+                    ...restaurant.toJSON(), 
+                    count: data.count 
                 };
             }
         }
         return null;
     }
 
+    // Replace the existing createOrder method with this version.
+    // Updated createOrder method using the Builder Pattern
     async createOrder(userId, orderData, io, req) {
         const StandardCheckoutBuilder = require('../builders/checkout/StandardCheckoutBuilder');
         const CheckoutDirector = require('../builders/checkout/CheckoutDirector');
 
         const builder = new StandardCheckoutBuilder(userId, orderData);
         const director = new CheckoutDirector(builder);
+        
+        // Use the director to construct the complex CheckoutRequest object
         const checkoutRequest = await director.constructRequest();
 
-        const coordinator = new OrderFulfillmentCoordinator({
-            paymentService,
-            sequelize,
-            models: {
-                Order,
-                OrderItem,
-                Notification,
-                MenuItem,
-                Restaurant,
-                Address,
-            },
-        });
+        // 1. Online payment path (VNPay)
+        if (checkoutRequest.paymentMethod === 'vnpay') {
+            const session = await paymentService.createCheckoutSession({
+                userId,
+                restaurantId: checkoutRequest.restaurantId,
+                addressId: checkoutRequest.addressId,
+                notes: checkoutRequest.notes,
+                gatewayName: 'vnpay',
+                ipAddr: paymentService.getClientIp(req),
+            });
 
-        return coordinator.placeOrder({
-            userId,
-            checkoutRequest,
-            gatewayName: checkoutRequest.paymentMethod,
-            ipAddr: paymentService.getClientIp(req),
-            io,
-        });
+            return {
+                order: null,
+                requiresPayment: true,
+                paymentUrl: session.paymentUrl,
+                txnRef: session.txnRef,
+                amount: session.amount,
+            };
+        }
+
+        // 2. COD path: Proceed with database records creation
+        const t = await sequelize.transaction();
+
+        try {
+            const order = await Order.create({
+                customer_id: checkoutRequest.customerId,
+                restaurant_id: checkoutRequest.restaurantId,
+                delivery_address_id: checkoutRequest.addressId,
+                notes: checkoutRequest.notes,
+                subtotal: checkoutRequest.subtotal,
+                delivery_fee: checkoutRequest.deliveryFee,
+                total_amount: checkoutRequest.totalAmount,
+                status: 'pending',
+                payment_status: 'pending',
+                payment_method: 'cod',
+            }, { transaction: t });
+
+            const finalOrderItems = checkoutRequest.finalOrderItems.map(item => ({
+                order_id: order.id,
+                menu_item_id: item.menu_item_id,
+                menu_item_name: item.menu_item_name,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                subtotal: item.subtotal,
+            }));
+
+            await OrderItem.bulkCreate(finalOrderItems, { transaction: t });
+
+            await Notification.create({
+                user_id: userId,
+                type: 'order',
+                title: 'Đặt hàng thành công',
+                message: `Đơn hàng ${order.id} đã được tạo thành công.`
+            }, { transaction: t });
+
+            await t.commit();
+
+            const fullOrder = await Order.findByPk(order.id, {
+                include: [
+                    { model: OrderItem, include: [{ model: MenuItem }] },
+                    { model: Restaurant, attributes: ['id', 'name'] },
+                    { model: Address, attributes: ['id', 'street', 'city'] },
+                    {
+                        model: Customer,
+                        attributes: ['id', 'user_id'],
+                        include: [{ model: User, attributes: ['email', 'full_name'] }]
+                    }
+                ]
+            });
+
+            const customerSocketId = fullOrder?.Customer?.user_id;
+            const customerEmail = fullOrder?.Customer?.User?.email;
+            const customerName = fullOrder?.Customer?.User?.full_name;
+
+            await notificationService.notifyMany([
+                customerSocketId ? {
+                    channel: 'push',
+                    recipient: customerSocketId,
+                    io,
+                    orderId: order.id,
+                    subject: 'Đặt hàng thành công',
+                    content: `Đơn hàng ${order.id} đã được tạo thành công.`,
+                    pushEvent: 'ORDER_CREATED',
+                    payload: {
+                        orderId: order.id,
+                        status: 'pending',
+                    },
+                } : null,
+                customerEmail ? {
+                    channel: 'email',
+                    recipient: customerEmail,
+                    orderId: order.id,
+                    subject: 'Đặt hàng thành công',
+                    content: `Đơn hàng ${order.id} đã được tạo thành công và đang chờ xử lý.`,
+                    customerName,
+                } : null,
+            ].filter(Boolean));
+
+            return {
+                order: fullOrder,
+                requiresPayment: false,
+                paymentUrl: null,
+            };
+        } catch (error) {
+            if (t && !t.finished) await t.rollback();
+            throw error;
+        }
     }
+    
+    
 
     async updateStatus(orderId, status, user, io) {
         const nextStatus = String(status || '').toLowerCase();
@@ -225,6 +318,7 @@ class OrderService {
 
         order.status = stateContext.getCurrentStatus();
 
+        // If order is COD and status is delivered or completed, mark as paid
         if ((order.status === 'delivered' || order.status === 'completed') && order.payment_method === 'cod') {
             order.payment_status = 'paid';
         }
@@ -234,10 +328,12 @@ class OrderService {
         const statusData = { orderId: order.id, status: order.status };
 
         if (order.Customer && io) {
+            console.log(`📡 Socket.io: Emitting ORDER_STATUS_UPDATED to customer ${order.Customer.user_id}:`, statusData);
             io.to(order.Customer.user_id).emit('ORDER_STATUS_UPDATED', statusData);
         }
-
+    
         if (order.Restaurant && io) {
+            console.log(`📡 Socket.io: Emitting ORDER_STATUS_UPDATED to restaurant ${order.Restaurant.user_id}:`, statusData);
             io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', statusData);
         }
 
@@ -248,28 +344,42 @@ class OrderService {
             });
         }
 
-        if (oldStatus !== 'delivered' && order.status === 'delivered') {
-            const customerEmail = order.Customer?.User?.email;
-            const customerName = order.Customer?.User?.full_name;
-            const restaurantName = order.Restaurant?.name;
+        const customerSocketId = order.Customer?.user_id;
+        const customerEmail = order.Customer?.User?.email;
+        const customerName = order.Customer?.User?.full_name;
+        const restaurantName = order.Restaurant?.name;
 
-            if (customerEmail) {
-                sendDeliveredOrderEmail({
-                    to: customerEmail,
-                    customerName,
-                    orderId: order.id,
-                    restaurantName,
-                }).catch((mailError) => {
-                    console.error('Send delivered email failed:', mailError);
-                });
-            }
-        }
+        notificationService.notifyMany([
+            customerSocketId ? {
+                channel: 'push',
+                recipient: customerSocketId,
+                io,
+                orderId: order.id,
+                status: order.status,
+                subject: 'Cập nhật giao hàng',
+                content: `Đơn hàng ${order.id} đã chuyển sang trạng thái ${order.status}.`,
+                pushEvent: 'ORDER_STATUS_UPDATED',
+                payload: { orderId: order.id, status: order.status },
+            } : null,
+            oldStatus !== 'delivered' && order.status === 'delivered' && customerEmail ? {
+                channel: 'email',
+                recipient: customerEmail,
+                orderId: order.id,
+                status: 'delivered',
+                subject: 'Đơn hàng đã được giao thành công',
+                content: `Đơn hàng ${order.id} đã được giao thành công.`,
+                customerName,
+                restaurantName,
+            } : null,
+        ].filter(Boolean)).catch((notifyError) => {
+            console.error('Delivery notification failed:', notifyError);
+        });
 
         return order;
     }
 
     async getAvailableDeliveries() {
-        return Order.findAll({
+        return await Order.findAll({
             where: {
                 status: 'preparing',
                 delivery_partner_id: null
@@ -302,15 +412,15 @@ class OrderService {
 
         const fullOrder = await Order.findByPk(order.id, {
             include: [
-                {
-                    model: DeliveryPartner,
-                    include: [{ model: User, attributes: ['full_name', 'phone_number'] }]
+                { 
+                    model: DeliveryPartner, 
+                    include: [{ model: User, attributes: ['full_name', 'phone_number'] }] 
                 }
             ]
         });
 
-        const statusData = {
-            orderId: order.id,
+        const statusData = { 
+            orderId: order.id, 
             status: order.status,
             deliveryPartner: fullOrder.DeliveryPartner
         };
@@ -328,7 +438,7 @@ class OrderService {
         const driver = await DeliveryPartner.findOne({ where: { user_id: userId } });
         if (!driver) throw new Error('Driver profile not found');
 
-        return Order.findAll({
+        return await Order.findAll({
             where: {
                 delivery_partner_id: driver.id,
                 status: 'picked_up'
@@ -346,7 +456,7 @@ class OrderService {
         const driver = await DeliveryPartner.findOne({ where: { user_id: userId } });
         if (!driver) throw new Error('Driver profile not found');
 
-        return Order.findAll({
+        return await Order.findAll({
             where: {
                 delivery_partner_id: driver.id,
                 status: { [Op.in]: ['delivered', 'completed'] }
@@ -402,6 +512,7 @@ class OrderService {
             };
         }
 
+        // Chỉ đổi sang refunded khi refund thành công thật
         if (refund.refundResponseCode === '99') {
             order.status = 'cancelled';
             order.payment_status = 'refunded';
@@ -440,10 +551,11 @@ class OrderService {
         const restaurant = await Restaurant.findOne({ where: { user_id: userId } });
         if (!restaurant) throw new Error('Restaurant not found for this user');
 
-        const targetYear = parseInt(year, 10) || new Date().getFullYear();
+        const targetYear = parseInt(year) || new Date().getFullYear();
         const startOfYear = new Date(targetYear, 0, 1, 0, 0, 0, 0);
         const endOfYear = new Date(targetYear, 11, 31, 23, 59, 59, 999);
 
+        // All delivered/completed orders for the target year
         const deliveredOrders = await Order.findAll({
             where: {
                 restaurant_id: restaurant.id,
@@ -458,6 +570,7 @@ class OrderService {
             ]
         });
 
+        // Monthly revenue (12 months)
         const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         const monthlyRevenue = MONTHS.map(month => ({ month, revenue: 0 }));
         deliveredOrders.forEach(order => {
@@ -470,6 +583,7 @@ class OrderService {
         const totalOrders = deliveredOrders.length;
         const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
+        // Top 5 best-selling dishes by quantity
         const dishMap = {};
         deliveredOrders.forEach(order => {
             (order.OrderItems || []).forEach(item => {
@@ -483,6 +597,7 @@ class OrderService {
             .sort((a, b) => b.quantity - a.quantity)
             .slice(0, 5);
 
+        // Category distribution by quantity sold
         const catMap = {};
         deliveredOrders.forEach(order => {
             (order.OrderItems || []).forEach(item => {
@@ -495,6 +610,7 @@ class OrderService {
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value);
 
+        // All recent orders across all statuses for the selected year
         const recentOrders = await Order.findAll({
             where: {
                 restaurant_id: restaurant.id,

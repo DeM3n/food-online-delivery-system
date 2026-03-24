@@ -1,4 +1,5 @@
 const paymentService = require('../services/paymentService');
+const orderFulfillmentCoordinator = require('../services/fulfillment/OrderFulfillmentCoordinator');
 
 exports.createVNPayPayment = async (req, res) => {
   try {
@@ -23,7 +24,7 @@ exports.createVNPayPayment = async (req, res) => {
 
 exports.vnpayReturn = async (req, res) => {
   try {
-    const finalized = await paymentService.finalizeGatewayResult({
+    const finalized = await orderFulfillmentCoordinator.processPaymentResult({
       gatewayName: 'vnpay',
       query: req.query,
       source: 'return',
@@ -39,7 +40,7 @@ exports.vnpayReturn = async (req, res) => {
 
 exports.vnpayIpn = async (req, res) => {
   try {
-    const finalized = await paymentService.finalizeGatewayResult({
+    const finalized = await orderFulfillmentCoordinator.processPaymentResult({
       gatewayName: 'vnpay',
       query: req.query,
       source: 'ipn',
