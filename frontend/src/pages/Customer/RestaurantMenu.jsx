@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { addToCartAsync } from '../../redux/slices/cartSlice';
 import axios from '../../api/axios';
 import { notification } from 'antd';
@@ -18,6 +18,7 @@ export default function RestaurantMenu() {
     const { restaurantId } = useParams();
     const navigate = useNavigate();
     const dispatch = useDispatch();
+    const { items: cartItems } = useSelector(state => state.cart);
     const [restaurant, setRestaurant] = useState(null);
     const [menu, setMenu] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -99,6 +100,17 @@ export default function RestaurantMenu() {
             notification.warning({
                 message: 'Restaurant is closed',
                 description: 'You cannot add items while this restaurant is closed.',
+                placement: 'topRight'
+            });
+            return;
+        }
+
+        // Check quantity limit across current cart
+        const existingItem = cartItems.find(i => i.id === item.id);
+        if (existingItem && existingItem.quantity >= 20) {
+            notification.warning({
+                message: 'Limit Reached',
+                description: `You already have 20 units of ${item.name} in your cart. That is the maximum per order.`,
                 placement: 'topRight'
             });
             return;

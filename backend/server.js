@@ -38,7 +38,7 @@ app.use((req, res, next) => {
 });
 
 // Import routes
-const authRoutes = require('./routes/authRoutes');
+// const authRoutes = require('./routes/authRoutes'); // MOVED TO IDENTITY-SERVICE
 const restaurantRoutes = require('./routes/restaurantRoutes');
 const menuRoutes = require('./routes/menuRoutes');
 // const orderRoutes = require('./routes/orderRoutes'); // MOVED TO ORDER-SERVICE
@@ -47,7 +47,7 @@ const cartRoutes = require('./routes/cartRoutes');
 // const paymentRoutes = require('./routes/paymentRoutes'); // MOVED TO ORDER-SERVICE
 
 // Mount routes
-app.use('/api/auth', authRoutes);
+// app.use('/api/auth', authRoutes); // HANDLED BY IDENTITY-SERVICE VIA GATEWAY
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/menu', menuRoutes);
 // app.use('/api/orders', orderRoutes); // HANDLED BY ORDER-SERVICE VIA GATEWAY

@@ -5,7 +5,7 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-import { DollarOutlined, ShoppingOutlined, BarChartOutlined, SyncOutlined, DownloadOutlined } from '@ant-design/icons';
+import { DollarOutlined, ShoppingOutlined, BarChartOutlined, SyncOutlined, DownloadOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 
 const PIE_COLORS = ['#FF6B35', '#22c55e', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'];
 
@@ -55,6 +55,8 @@ export default function RestaurantSummary() {
   const [loading, setLoading] = useState(true);
   const [orderPage, setOrderPage] = useState(1);
   const [monthFilter, setMonthFilter] = useState('all');
+  const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
+  const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
   const ORDER_PAGE_SIZE = 10;
   const yearOptions = buildYearOptions();
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -168,15 +170,56 @@ export default function RestaurantSummary() {
           <p className="text-gray-400 text-sm mt-1">Performance summary for {profile?.name || 'your restaurant'}</p>
         </div>
         <div className="flex items-center gap-3">
-          <select
-            value={year}
-            onChange={e => setYear(Number(e.target.value))}
-            className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            {yearOptions.map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          {/* Year Navigator Dropdown - Scalable Version */}
+          <div className="relative">
+            <div 
+              onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
+              className="border border-gray-200 rounded-xl px-5 py-2.5 flex items-center gap-4 bg-white shadow-sm cursor-pointer hover:border-primary transition-all text-sm font-semibold text-gray-700 min-w-[150px]"
+            >
+              <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-[10px]">
+                <BarChartOutlined />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-tighter font-black text-gray-400 leading-none mb-0.5">Year View</span>
+                <span>{year}</span>
+              </div>
+              <SyncOutlined className={`ml-auto text-[10px] text-gray-300 transition-transform duration-300 ${isYearDropdownOpen ? 'rotate-180': ''}`} />
+            </div>
+
+            {isYearDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setIsYearDropdownOpen(false)}></div>
+                <div className="absolute top-full right-0 mt-2 w-[220px] bg-white rounded-3xl shadow-2xl border border-gray-100 p-4 z-20 animate-in fade-in slide-in-from-top-4 duration-300">
+                  <div className="flex items-center justify-between mb-4 px-1">
+                    <button onClick={() => setYear(year - 1)} className="w-8 h-8 rounded-full hover:bg-gray-50 flex items-center justify-center text-gray-400">
+                      <LeftOutlined className="text-[10px]" />
+                    </button>
+                    <span className="font-black text-gray-800 tracking-tighter">Choose Year</span>
+                    <button onClick={() => setYear(year + 1)} className="w-8 h-8 rounded-full hover:bg-gray-50 flex items-center justify-center text-gray-400">
+                      <RightOutlined className="text-[10px]" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {yearOptions.map(y => (
+                      <div 
+                        key={y}
+                        onClick={() => {
+                          setYear(y);
+                          setIsYearDropdownOpen(false);
+                        }}
+                        className={`py-2 rounded-xl text-center text-xs font-bold cursor-pointer transition-all ${
+                          year === y ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        {y}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           <button
             onClick={fetchSummary}
             disabled={loading}
@@ -334,16 +377,47 @@ export default function RestaurantSummary() {
               <h2 className="text-lg font-bold text-gray-800">Recent Orders</h2>
               <div className="flex items-center gap-3">
                 {/* Month filter */}
-                <select
-                  value={monthFilter}
-                  onChange={e => { setMonthFilter(e.target.value); setOrderPage(1); }}
-                  className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold text-gray-700 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="all">All months</option>
-                  {MONTHS.map((m, i) => (
-                    <option key={i} value={i}>{m}</option>
-                  ))}
-                </select>
+                {/* Month filter dropdown */}
+                <div className="relative">
+                  <div 
+                    onClick={() => setIsMonthDropdownOpen(!isMonthDropdownOpen)}
+                    className="border border-gray-200 rounded-xl px-4 py-2 text-sm font-semibold text-gray-700 bg-white shadow-sm cursor-pointer hover:border-primary transition-all flex items-center gap-2 min-w-[130px]"
+                  >
+                    <span>{monthFilter === 'all' ? 'All Months' : MONTHS[Number(monthFilter)]}</span>
+                    <SyncOutlined className={`ml-auto text-[10px] text-gray-400 transition-transform duration-300 ${isMonthDropdownOpen ? 'rotate-180': ''}`} />
+                  </div>
+
+                  {isMonthDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsMonthDropdownOpen(false)}></div>
+                      <div className="absolute top-full right-0 mt-2 w-full min-w-[140px] bg-white rounded-xl shadow-2xl border border-gray-100 p-1.5 z-20 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div 
+                          onClick={() => { setMonthFilter('all'); setOrderPage(1); setIsMonthDropdownOpen(false); }}
+                          className={`px-3 py-2 rounded-lg cursor-pointer text-sm transition-all ${
+                            monthFilter === 'all' ? 'bg-primary/5 text-primary font-bold' : 'text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          All Months
+                        </div>
+                        {MONTHS.map((m, i) => (
+                          <div 
+                            key={i}
+                            onClick={() => {
+                              setMonthFilter(String(i));
+                              setOrderPage(1);
+                              setIsMonthDropdownOpen(false);
+                            }}
+                            className={`px-3 py-2 rounded-lg cursor-pointer text-sm transition-all ${
+                              monthFilter === String(i) ? 'bg-primary/5 text-primary font-bold' : 'text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            {m}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
                 {data.recentOrders.length > 0 && (
                   <span className="text-xs text-gray-400">
                     {(() => {

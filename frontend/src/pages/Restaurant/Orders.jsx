@@ -70,25 +70,24 @@ export default function RestaurantOrders() {
     if (profile?.id) {
       fetchOrders();
 
-      socket.connect();
-      socket.emit('join', user.id);
-
-      socket.on('NEW_ORDER', (data) => {
+      const handleNewOrder = (data) => {
         notification.success({
           message: 'New Order Received!',
           description: `Order #${data.orderId.slice(0, 8)} has been placed.`,
         });
         fetchOrders();
-      });
+      };
 
-      socket.on('ORDER_STATUS_UPDATED', () => {
+      const handleStatusUpdate = () => {
         fetchOrders();
-      });
+      };
+
+      socket.on('NEW_ORDER', handleNewOrder);
+      socket.on('ORDER_STATUS_UPDATED', handleStatusUpdate);
 
       return () => {
-        socket.off('NEW_ORDER');
-        socket.off('ORDER_STATUS_UPDATED');
-        socket.disconnect();
+        socket.off('NEW_ORDER', handleNewOrder);
+        socket.off('ORDER_STATUS_UPDATED', handleStatusUpdate);
       };
     }
   }, [profile, user, selectedStatus]);

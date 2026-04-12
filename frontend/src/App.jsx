@@ -5,6 +5,7 @@ import axios from './api/axios';
 import socket from './socket';
 import { loginSuccess, logout as logoutAction } from './redux/slices/authSlice';
 import { fetchCart, resetCartState } from './redux/slices/cartSlice';
+import { setActiveCount, incrementActiveCount, decrementActiveCount } from './redux/slices/orderSlice';
 
 // Layouts
 import CustomerLayout from './components/layouts/CustomerLayout';
@@ -106,6 +107,11 @@ function App() {
       console.log('Connected to real-time server');
       if (user && user.id) {
         socket.emit('join', user.id);
+        
+        // Drivers also join the available_deliveries room
+        if (user.role === 'delivery_partner') {
+          socket.emit('join_deliveries');
+        }
       }
     };
 
@@ -115,12 +121,88 @@ function App() {
       socket.off('connect', onConnect);
       socket.disconnect();
     };
-  }, []); // Only connect/disconnect on mount/unmount
+  }, []);
+
+  // Fetch initial active count when authenticated
+  useEffect(() => {
+    const fetchActiveCount = async () => {
+      if (isAuthenticated && (user.role === 'restaurant' || user.role === 'delivery_partner')) {
+        try {
+          const response = await axios.get('/orders/active-count');
+          console.log(`📊 Active Count for ${user.role}:`, response.data.count);
+          if (response.data.success) {
+            dispatch(setActiveCount(response.data.count));
+          }
+        } catch (error) {
+          console.error('Error fetching active count:', error);
+        }
+      }
+    };
+
+    fetchActiveCount();
+  }, [isAuthenticated, user?.role, dispatch]);
+
+  // Global Order Socket Listeners
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const handleNewOrder = (data) => {
+      if (user.role === 'restaurant') {
+        dispatch(incrementActiveCount());
+      }
+    };
+
+    const handleAvailableDelivery = (data) => {
+      if (user.role === 'delivery_partner') {
+        dispatch(incrementActiveCount());
+      }
+    };
+
+    const handleOrderAccepted = (data) => {
+      if (user.role === 'delivery_partner') {
+        // Someone took an order from the available pool
+        dispatch(decrementActiveCount());
+      }
+    };
+
+    const handleStatusUpdate = (data) => {
+      if (user.role === 'restaurant') {
+        if (data.status === 'preparing' || data.status === 'cancelled') {
+          // Moved out of pending/accepted pool
+          dispatch(decrementActiveCount());
+        }
+      } else if (user.role === 'delivery_partner') {
+        if (data.status === 'delivered' || data.status === 'cancelled') {
+          // Driver finished or order was cancelled while with driver
+          dispatch(decrementActiveCount());
+        } else if (data.status === 'picked_up') {
+          // I just accepted an order! (Available pool decremented via ORDER_ACCEPTED, 
+          // but now I increment for my active delivery)
+          dispatch(incrementActiveCount());
+        }
+      }
+    };
+
+    socket.on('NEW_ORDER', handleNewOrder);
+    socket.on('AVAILABLE_DELIVERY', handleAvailableDelivery);
+    socket.on('ORDER_ACCEPTED', handleOrderAccepted);
+    socket.on('ORDER_STATUS_UPDATED', handleStatusUpdate);
+
+    return () => {
+      socket.off('NEW_ORDER', handleNewOrder);
+      socket.off('AVAILABLE_DELIVERY', handleAvailableDelivery);
+      socket.off('ORDER_ACCEPTED', handleOrderAccepted);
+      socket.off('ORDER_STATUS_UPDATED', handleStatusUpdate);
+    };
+  }, [isAuthenticated, user?.role, dispatch]);
 
   // Handle User Room Joining when auth state changes
   useEffect(() => {
     if (socket.connected && user && user.id) {
       socket.emit('join', user.id);
+      if (user.role === 'delivery_partner') {
+        socket.emit('join_deliveries');
+      }
     }
   }, [user]);
 

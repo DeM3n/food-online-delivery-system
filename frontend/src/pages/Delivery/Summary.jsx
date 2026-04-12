@@ -5,7 +5,7 @@ import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { TrophyOutlined, DollarOutlined, BarChartOutlined, SyncOutlined } from '@ant-design/icons';
+import { TrophyOutlined, DollarOutlined, BarChartOutlined, SyncOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 
 const DELIVERY_FEE_FALLBACK = 15000;
 
@@ -55,6 +55,7 @@ export default function DriverSummary() {
 
   const monthOptions = useMemo(() => buildYearMonthOptions(), []);
   const [selectedOption, setSelectedOption] = useState(monthOptions[0]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -124,22 +125,78 @@ export default function DriverSummary() {
         </div>
 
         {/* Month Selector */}
-        <div className="bg-white border border-gray-100 rounded-2xl shadow-soft px-4 py-2.5 flex items-center gap-3">
-          <BarChartOutlined className="text-primary" />
-          <select
-            className="outline-none bg-transparent text-sm font-bold text-gray-700 cursor-pointer min-w-[180px]"
-            value={`${selectedOption.year}-${selectedOption.month}`}
-            onChange={(e) => {
-              const opt = monthOptions.find(o => `${o.year}-${o.month}` === e.target.value);
-              if (opt) setSelectedOption(opt);
-            }}
+        <div className="relative group">
+          <div 
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="bg-white border border-gray-100 rounded-2xl shadow-soft px-5 py-3 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-all min-w-[200px]"
           >
-            {monthOptions.map(opt => (
-              <option key={`${opt.year}-${opt.month}`} value={`${opt.year}-${opt.month}`}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+              <BarChartOutlined />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase tracking-widest font-black text-gray-400 leading-none mb-1">Select Period</span>
+              <span className="text-sm font-bold text-gray-700">{selectedOption.label}</span>
+            </div>
+            <SyncOutlined className={`ml-auto text-xs text-gray-300 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+          </div>
+
+          {isDropdownOpen && (
+            <>
+              <div 
+                className="fixed inset-0 z-10" 
+                onClick={() => setIsDropdownOpen(false)}
+              ></div>
+              <div className="absolute top-full right-0 mt-2 w-[280px] bg-white rounded-[2rem] shadow-2xl border border-gray-100 p-5 z-20 animate-in fade-in slide-in-from-top-4 duration-300">
+                {/* Year Selection Header */}
+                <div className="flex items-center justify-between mb-5 px-1">
+                  <button 
+                    onClick={() => {
+                        const newYear = selectedOption.year - 1;
+                        const opt = monthOptions.find(o => o.year === newYear && o.month === selectedOption.month) || { label: `${MONTH_NAMES[selectedOption.month]} ${newYear}`, year: newYear, month: selectedOption.month };
+                        setSelectedOption(opt);
+                    }}
+                    className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-colors"
+                  >
+                    <LeftOutlined className="text-[10px]" />
+                  </button>
+                  <span className="text-sm font-black text-gray-800 tracking-tighter">{selectedOption.year}</span>
+                  <button 
+                    onClick={() => {
+                        const newYear = selectedOption.year + 1;
+                        const opt = monthOptions.find(o => o.year === newYear && o.month === selectedOption.month) || { label: `${MONTH_NAMES[selectedOption.month]} ${newYear}`, year: newYear, month: selectedOption.month };
+                        setSelectedOption(opt);
+                    }}
+                    className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-colors"
+                  >
+                    <RightOutlined className="text-[10px]" />
+                  </button>
+                </div>
+
+                {/* Month Grid (4x3) */}
+                <div className="grid grid-cols-3 gap-2">
+                  {MONTH_NAMES.map((m, idx) => {
+                    const isActive = idx === selectedOption.month;
+                    return (
+                      <div 
+                        key={m}
+                        onClick={() => {
+                          setSelectedOption({ label: `${m} ${selectedOption.year}`, year: selectedOption.year, month: idx });
+                          setIsDropdownOpen(false);
+                        }}
+                        className={`py-3 rounded-2xl text-center text-xs font-bold cursor-pointer transition-all ${
+                          isActive 
+                            ? 'bg-primary text-white shadow-lg shadow-primary/30' 
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+                        }`}
+                      >
+                        {m.slice(0, 3)}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

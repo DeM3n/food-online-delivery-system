@@ -87,13 +87,23 @@ export default function CartPage() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => dispatch(updateQuantityAsync({ itemId: item.cartItemId, quantity: item.quantity - 1 }))}
-                    className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center font-bold"
                   >-</button>
-                  <span className="font-semibold w-4 text-center">{item.quantity}</span>
+                  <span className="font-semibold w-6 text-center">{item.quantity}</span>
                   <button
-                    onClick={() => dispatch(updateQuantityAsync({ itemId: item.cartItemId, quantity: item.quantity + 1 }))}
-                    disabled={!item.isAvailable}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white ${!item.isAvailable ? 'bg-gray-300 cursor-not-allowed' : 'bg-primary hover:bg-orange-600'}`}
+                    onClick={() => {
+                        if (item.quantity >= 20) {
+                            notification.info({
+                                message: 'Limit Reached',
+                                description: 'You can only order up to 20 units of each item per order.',
+                                placement: 'topRight'
+                            });
+                            return;
+                        }
+                        dispatch(updateQuantityAsync({ itemId: item.cartItemId, quantity: item.quantity + 1 }));
+                    }}
+                    disabled={!item.isAvailable || item.quantity >= 20}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white ${(!item.isAvailable || item.quantity >= 20) ? 'bg-gray-300 cursor-not-allowed' : 'bg-primary hover:bg-orange-600'}`}
                   >+</button>
                 </div>
                 <button

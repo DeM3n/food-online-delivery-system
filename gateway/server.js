@@ -13,6 +13,7 @@ const PORT = process.env.GATEWAY_PORT || 8000;
 const SERVICES = {
     BACKEND: process.env.BACKEND_URL || 'http://localhost:5001',
     ORDER_SERVICE: process.env.ORDER_SERVICE_URL || 'http://localhost:5002',
+    IDENTITY_SERVICE: process.env.IDENTITY_SERVICE_URL || 'http://localhost:5003',
 };
 
 // 1. Security Headers (Helmet) - Adjusted for development
@@ -50,6 +51,26 @@ app.get('/health', (req, res) => {
  * 5. Proxy Configuration - REST API
  */
 
+// Route Identity (Auth) Service
+app.use('/api/auth', createProxyMiddleware({
+    target: SERVICES.IDENTITY_SERVICE,
+    changeOrigin: true,
+    onProxyReq: (proxyReq, req, res) => {
+        proxyReq.setHeader('X-Gateway-Request', 'true');
+        proxyReq.setHeader('X-Service-Name', 'identity-service');
+    },
+    onProxyRes: (proxyRes, req, res) => {
+        proxyRes.headers['X-Service-Name'] = 'identity-service';
+    },
+    onError: (err, req, res) => {
+        console.error('Proxy Error (Identity Service):', err.message);
+        res.status(502).json({ 
+            error: 'Bad Gateway', 
+            details: 'The identity service is currently unavailable.' 
+        });
+    }
+}));
+
 // Route Order & Payment Service (more specific)
 app.use(['/api/orders', '/api/payments'], createProxyMiddleware({
     target: SERVICES.ORDER_SERVICE,
@@ -57,6 +78,9 @@ app.use(['/api/orders', '/api/payments'], createProxyMiddleware({
     onProxyReq: (proxyReq, req, res) => {
         proxyReq.setHeader('X-Gateway-Request', 'true');
         proxyReq.setHeader('X-Service-Name', 'order-service');
+    },
+    onProxyRes: (proxyRes, req, res) => {
+        proxyRes.headers['X-Service-Name'] = 'order-service';
     },
     onError: (err, req, res) => {
         console.error('Proxy Error (Order Service):', err.message);
@@ -87,7 +111,7 @@ app.use('/api', createProxyMiddleware({
  * 6. Proxy Configuration - Socket.io (WebSockets)
  */
 const socketProxy = createProxyMiddleware({
-    target: SERVICES.BACKEND,
+    target: SERVICES.ORDER_SERVICE, // Point to ORDER_SERVICE for real-time order events
     changeOrigin: true,
     ws: true, 
     logLevel: 'debug',

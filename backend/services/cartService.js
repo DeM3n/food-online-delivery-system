@@ -62,10 +62,19 @@ class CartService {
             where: { cart_id: cart.id, menu_item_id } 
         });
 
+        const MAX_QUANTITY = 20;
+
         if (cartItem) {
-            cartItem.quantity += Number(quantity);
+            const newQuantity = cartItem.quantity + Number(quantity);
+            if (newQuantity > MAX_QUANTITY) {
+                throw new Error(`Maximum quantity per item is ${MAX_QUANTITY}`);
+            }
+            cartItem.quantity = newQuantity;
             await cartItem.save();
         } else {
+            if (Number(quantity) > MAX_QUANTITY) {
+                throw new Error(`Maximum quantity per item is ${MAX_QUANTITY}`);
+            }
             cartItem = await CartItem.create({
                 cart_id: cart.id,
                 menu_item_id,
@@ -76,12 +85,16 @@ class CartService {
     }
 
     async updateQuantity(itemId, quantity) {
+        const MAX_QUANTITY = 20;
         const cartItem = await CartItem.findByPk(itemId);
         if (!cartItem) throw new Error('Cart item not found');
 
         if (quantity <= 0) {
             await cartItem.destroy();
         } else {
+            if (quantity > MAX_QUANTITY) {
+                throw new Error(`Maximum quantity per item is ${MAX_QUANTITY}`);
+            }
             cartItem.quantity = quantity;
             await cartItem.save();
         }

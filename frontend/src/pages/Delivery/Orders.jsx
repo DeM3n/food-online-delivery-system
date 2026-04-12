@@ -50,23 +50,25 @@ export default function DeliveryOrders() {
       socket.connect();
       socket.emit('join_deliveries');
 
-      socket.on('AVAILABLE_DELIVERY', (data) => {
+      const handleAvailableDelivery = (data) => {
         notification.info({
           message: 'New Delivery Available!',
           description: `A new order from ${data.restaurantName} is ready for pickup.`,
           placement: 'topRight'
         });
         fetchDeliveries();
-      });
+      };
 
-      socket.on('ORDER_ACCEPTED', () => {
+      const handleOrderAccepted = () => {
         fetchDeliveries();
-      });
+      };
+
+      socket.on('AVAILABLE_DELIVERY', handleAvailableDelivery);
+      socket.on('ORDER_ACCEPTED', handleOrderAccepted);
 
       return () => {
-        socket.off('AVAILABLE_DELIVERY');
-        socket.off('ORDER_ACCEPTED');
-        socket.disconnect();
+        socket.off('AVAILABLE_DELIVERY', handleAvailableDelivery);
+        socket.off('ORDER_ACCEPTED', handleOrderAccepted);
       };
     }
   }, [profile, token]);

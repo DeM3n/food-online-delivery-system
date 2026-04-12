@@ -178,3 +178,50 @@ exports.cancelOrder = async (req, res) => {
         res.status(statusCode).json({ success: false, message: error.message });
     }
 };
+
+exports.getActiveCount = async (req, res) => {
+    try {
+        const { id, role } = req.user;
+        const { Order, Restaurant, DeliveryPartner } = require('../models');
+        const { Op } = require('sequelize');
+
+        let count = 0;
+
+        if (role === 'restaurant') {
+            const restaurant = await Restaurant.findOne({ where: { user_id: id } });
+            if (restaurant) {
+                count = await Order.count({
+                    where: {
+                        restaurant_id: restaurant.id,
+                        status: { [Op.in]: ['pending', 'accepted'] }
+                    }
+                });
+            }
+        } else if (role === 'delivery_partner') {
+            const driver = await DeliveryPartner.findOne({ where: { user_id: id } });
+            if (driver) {
+                // For driver: their active deliveries (picked_up) + overall available ones (preparing and unassigned)
+                const activeCount = await Order.count({
+                    where: {
+                        delivery_partner_id: driver.id,
+                        status: 'picked_up'
+                    }
+                });
+                
+                const availableCount = await Order.count({
+                    where: {
+                        status: 'preparing',
+                        delivery_partner_id: null
+                    }
+                });
+                
+                count = activeCount + availableCount;
+            }
+        }
+
+        res.json({ success: true, count });
+    } catch (error) {
+        console.error('Error fetching active count:', error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};

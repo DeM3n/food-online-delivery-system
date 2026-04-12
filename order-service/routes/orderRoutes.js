@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { getRestaurantOrders, updateOrderStatus, getUserOrders, getMonthlyFavorite, createOrder, getAvailableDeliveries, acceptDelivery, getDriverDeliveries, getDriverHistory, cancelOrder, getRestaurantYearlySummary } = require('../controllers/orderController');
+const { getRestaurantOrders, updateOrderStatus, getUserOrders, getMonthlyFavorite, createOrder, getAvailableDeliveries, acceptDelivery, getDriverDeliveries, getDriverHistory, cancelOrder, getRestaurantYearlySummary, getActiveCount } = require('../controllers/orderController');
 const { protect } = require('../middleware/authMiddleware');
 
 router.post('/', protect, createOrder);
+router.get('/active-count', protect, getActiveCount);
 router.get('/deliveries/available', protect, getAvailableDeliveries);
 router.get('/driver/me', protect, getDriverDeliveries);
 router.get('/driver/me/history', protect, getDriverHistory);

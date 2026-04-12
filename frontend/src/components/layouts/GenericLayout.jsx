@@ -20,6 +20,7 @@ export default function GenericLayout({ roleTitle, rolePath }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user, profile } = useSelector(state => state.auth);
+  const activeCount = useSelector(state => state.order.activeCount);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -41,7 +42,12 @@ export default function GenericLayout({ roleTitle, rolePath }) {
 
           <nav className="space-y-2">
             <NavItem to={`${rolePath}`} icon={<AppstoreOutlined />} label="Dashboard" />
-            <NavItem to={`${rolePath}/orders`} icon={<ShoppingOutlined />} label="Orders" />
+            <NavItem 
+              to={`${rolePath}/orders`} 
+              icon={<ShoppingOutlined />} 
+              label="Orders" 
+              badge={activeCount}
+            />
             {roleTitle === 'Delivery Partner' && <NavItem to={`${rolePath}/summary`} icon={<BarChartOutlined />} label="Monthly Summary" />}
             {roleTitle === 'Restaurant' && <NavItem to={`${rolePath}/menu`} icon={<UnorderedListOutlined />} label="Menu Catalog" />}
             {roleTitle === 'Restaurant' && <NavItem to={`${rolePath}/summary`} icon={<BarChartOutlined />} label="Yearly Summary" />}
@@ -90,15 +96,22 @@ export default function GenericLayout({ roleTitle, rolePath }) {
   );
 }
 
-function NavItem({ to, icon, label }) {
+function NavItem({ to, icon, label, badge }) {
   return (
     <Link
       to={to}
-      className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all duration-200 group font-medium"
+      className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all duration-200 group font-medium relative"
     >
       <span className="text-lg opacity-70 group-hover:opacity-100 transition-opacity flex items-center">{icon}</span>
       <span className="text-sm">{label}</span>
-      <ArrowRightOutlined className="ml-auto opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all text-[10px]" />
+      
+      {badge > 0 && (
+        <span className="bg-red-500 text-white text-[10px] font-black min-w-[18px] h-[18px] flex items-center justify-center rounded-full shadow-lg shadow-red-500/30 animate-pulse ml-auto mr-2">
+          {badge}
+        </span>
+      )}
+
+      <ArrowRightOutlined className={`${badge > 0 ? 'ml-0' : 'ml-auto'} opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all text-[10px]`} />
     </Link>
   );
 }

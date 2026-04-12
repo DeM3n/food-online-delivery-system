@@ -154,10 +154,20 @@ class FulfillmentService {
             const fullOrder = await Order.findByPk(order.id, {
                 include: [
                     { model: OrderItem, include: [{ model: MenuItem }] },
-                    { model: Restaurant, attributes: ['id', 'name'] },
+                    { model: Restaurant, attributes: ['id', 'name', 'user_id'] },
                     { model: Address, attributes: ['id', 'street', 'city'] }
                 ]
             });
+
+            // Emit NEW_ORDER to the restaurant
+            if (fullOrder.Restaurant && io) {
+                console.log(`📡 Socket.io: Emitting NEW_ORDER to restaurant user ${fullOrder.Restaurant.user_id}`);
+                io.to(fullOrder.Restaurant.user_id).emit('NEW_ORDER', {
+                    orderId: fullOrder.id,
+                    status: fullOrder.status,
+                    total_amount: fullOrder.total_amount
+                });
+            }
 
             return {
                 order: fullOrder,
