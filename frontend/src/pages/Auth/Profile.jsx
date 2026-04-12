@@ -5,7 +5,7 @@ import * as Yup from 'yup';
 import axios from '../../api/axios';
 import { loginSuccess } from '../../redux/slices/authSlice';
 import { notification } from 'antd';
-import { UserOutlined } from '@ant-design/icons';
+import { UserOutlined, HeartFilled, HistoryOutlined } from '@ant-design/icons';
 import socket from '../../socket';
 
 const ProfileSchema = Yup.object().shape({
@@ -222,7 +222,7 @@ export default function Profile() {
                                 <>
                                     <div className="bg-orange-50 rounded-2xl p-6 border border-orange-100">
                                         <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                            <span className="text-2xl">🏆</span> Monthly Favorite
+                                            <HeartFilled className="text-2xl text-red-500" /> Monthly Favorite
                                         </h3>
                                         {favoriteRestaurant ? (
                                             <div className="flex items-center gap-4">
@@ -345,7 +345,7 @@ export default function Profile() {
                         </div>
                     ) : (
                         <div className="text-center py-10">
-                            <div className="text-5xl mb-4">🥡</div>
+                            <HistoryOutlined className="text-5xl text-gray-200 mb-4 block" />
                             <p className="text-gray-500 text-lg">You haven't placed any orders yet.</p>
                         </div>
                     )}

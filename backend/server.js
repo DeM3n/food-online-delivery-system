@@ -41,19 +41,19 @@ app.use((req, res, next) => {
 const authRoutes = require('./routes/authRoutes');
 const restaurantRoutes = require('./routes/restaurantRoutes');
 const menuRoutes = require('./routes/menuRoutes');
-const orderRoutes = require('./routes/orderRoutes');
+// const orderRoutes = require('./routes/orderRoutes'); // MOVED TO ORDER-SERVICE
 const adminRoutes = require('./routes/adminRoutes');
 const cartRoutes = require('./routes/cartRoutes');
-const paymentRoutes = require('./routes/paymentRoutes');
+// const paymentRoutes = require('./routes/paymentRoutes'); // MOVED TO ORDER-SERVICE
 
 // Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/menu', menuRoutes);
-app.use('/api/orders', orderRoutes);
+// app.use('/api/orders', orderRoutes); // HANDLED BY ORDER-SERVICE VIA GATEWAY
 app.use('/api/cart', cartRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/payments', paymentRoutes);
+// app.use('/api/payments', paymentRoutes); // HANDLED BY ORDER-SERVICE VIA GATEWAY
 
 // Socket.io Connection Logic
 io.on('connection', (socket) => {

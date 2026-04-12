@@ -4,6 +4,7 @@ import { updateQuantityAsync, removeItemAsync, fetchCart } from '../../redux/sli
 import { Link, useNavigate } from 'react-router-dom';
 import { notification } from 'antd';
 import socket from '../../socket';
+import { ExclamationCircleFilled } from '@ant-design/icons';
 
 export default function CartPage() {
   const { items, total } = useSelector(state => state.cart);
@@ -122,8 +123,8 @@ export default function CartPage() {
           </div>
           
           {hasUnavailableItems && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 text-xs rounded-lg border border-red-200 font-medium animate-pulse">
-              ⚠️ Some items are Out of Order. They are excluded from your total.
+            <div className="mb-4 p-3 bg-red-100 text-red-700 text-xs rounded-lg border border-red-200 font-medium animate-pulse flex items-center gap-2">
+              <ExclamationCircleFilled /> Some items are Out of Order. They are excluded from your total.
             </div>
           )}
           

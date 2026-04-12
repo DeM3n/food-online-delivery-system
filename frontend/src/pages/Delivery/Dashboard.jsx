@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import axios from '../../api/axios';
+import { TrophyFilled } from '@ant-design/icons';
 
 export default function DeliveryDashboard() {
   const { profile, token } = useSelector(state => state.auth);
@@ -151,7 +152,7 @@ export default function DeliveryDashboard() {
           </div>
         ) : (
           <div className="text-center py-10">
-            <span className="text-4xl mb-4 block">🏆</span>
+            <TrophyFilled className="text-4xl text-gray-200 mb-4 block" />
             <p className="text-gray-500 italic">No completed deliveries yet. Accept orders to build your history!</p>
           </div>
         )}

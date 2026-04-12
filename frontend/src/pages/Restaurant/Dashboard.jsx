@@ -4,6 +4,7 @@ import axios from '../../api/axios';
 import socket from '../../socket';
 import { notification } from 'antd';
 import { loginSuccess } from '../../redux/slices/authSlice';
+import { StarFilled } from '@ant-design/icons';
 
 export default function RestaurantDashboard() {
   const { profile, user, token } = useSelector(state => state.auth);
@@ -96,7 +97,7 @@ export default function RestaurantDashboard() {
   const stats = [
     { label: "Completed Orders (this month)", value: completedThisMonth, color: "border-primary" },
     { label: "Cancelled Orders (this month)", value: cancelledThisMonth, color: "border-secondary" },
-    { label: "Restaurant Rating", value: `${profile?.rating || 'N/A'} ⭐`, color: "border-accent" },
+    { label: "Restaurant Rating", value: <>{profile?.rating || 'N/A'} <StarFilled className="text-yellow-400 mb-1" /></>, color: "border-accent" },
   ];
 
   if (loading) return <div className="py-20 text-center text-xl">Loading dashboard...</div>;
@@ -219,7 +220,7 @@ export default function RestaurantDashboard() {
               menuItems.map(item => (
                 <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
                   <span className="font-medium text-gray-700">{item.name}</span>
-                  <span className="text-primary font-bold">{item.rating || '0'} ⭐</span>
+                  <span className="text-primary font-bold">{item.rating || '0'} <StarFilled className="text-yellow-400 mb-1" /></span>
                 </div>
               ))
             ) : (

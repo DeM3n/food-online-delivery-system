@@ -12,20 +12,21 @@ const app = express();
 const PORT = process.env.GATEWAY_PORT || 8000;
 const SERVICES = {
     BACKEND: process.env.BACKEND_URL || 'http://localhost:5001',
+    ORDER_SERVICE: process.env.ORDER_SERVICE_URL || 'http://localhost:5002',
 };
 
 // 1. Security Headers (Helmet) - Adjusted for development
 app.use(helmet({
-    contentSecurityPolicy: false, // Disable CSP in dev to avoid blocking assets
+    contentSecurityPolicy: false, 
 }));
 
 // 2. Logging (Morgan)
 app.use(morgan('dev'));
 
-// 3. Rate Limiting - Increased for development
+// 3. Rate Limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // Increased from 100 to 1000 for development
+    windowMs: 15 * 60 * 1000,
+    max: 1000,
     message: { error: 'Too many requests from this IP, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
@@ -48,6 +49,25 @@ app.get('/health', (req, res) => {
 /**
  * 5. Proxy Configuration - REST API
  */
+
+// Route Order & Payment Service (more specific)
+app.use(['/api/orders', '/api/payments'], createProxyMiddleware({
+    target: SERVICES.ORDER_SERVICE,
+    changeOrigin: true,
+    onProxyReq: (proxyReq, req, res) => {
+        proxyReq.setHeader('X-Gateway-Request', 'true');
+        proxyReq.setHeader('X-Service-Name', 'order-service');
+    },
+    onError: (err, req, res) => {
+        console.error('Proxy Error (Order Service):', err.message);
+        res.status(502).json({ 
+            error: 'Bad Gateway', 
+            details: 'The order service is currently unavailable.' 
+        });
+    }
+}));
+
+// Route everything else to Backend (Monolith)
 app.use('/api', createProxyMiddleware({
     target: SERVICES.BACKEND,
     changeOrigin: true,
@@ -80,17 +100,13 @@ app.use('/socket.io', socketProxy);
 
 const server = app.listen(PORT, () => {
     console.log(`🚀 API Gateway running at http://localhost:${PORT}`);
-    console.log(`🔗 Proxying /api and /socket.io traffic to: ${SERVICES.BACKEND}`);
+    console.log(`🔗 Proxying /api/orders to: ${SERVICES.ORDER_SERVICE}`);
+    console.log(`🔗 Proxying other /api calls to: ${SERVICES.BACKEND}`);
 });
 
 // Handle WebSocket upgrade manually
 server.on('upgrade', (req, socket, head) => {
-    console.log(`[Gateway] ⬆️ WebSocket Upgrade Request: ${req.url} (Host: ${req.headers.host})`);
-    
     if (req.url.startsWith('/socket.io')) {
-        console.log(`[Gateway] 🔀 Delegating /socket.io upgrade to Backend`);
         socketProxy.upgrade(req, socket, head);
-    } else {
-        console.log(`[Gateway] ⚠️ Upgrade request for unknown path: ${req.url}`);
     }
 });

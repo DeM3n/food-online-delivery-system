@@ -5,6 +5,14 @@ import { addToCartAsync } from '../../redux/slices/cartSlice';
 import axios from '../../api/axios';
 import { notification } from 'antd';
 import socket from '../../socket';
+import { 
+    StarFilled, 
+    LockFilled, 
+    ShopOutlined, 
+    CheckCircleFilled, 
+    CloseCircleFilled,
+    CoffeeOutlined
+} from '@ant-design/icons';
 
 export default function RestaurantMenu() {
     const { restaurantId } = useParams();
@@ -135,7 +143,7 @@ export default function RestaurantMenu() {
     if (restaurantClosed) {
         return (
             <div className="py-20 text-center flex flex-col items-center bg-white rounded-3xl border border-red-100 shadow-soft">
-                <span className="text-6xl mb-4">🔒</span>
+                <LockFilled className="text-6xl text-red-400 mb-4" />
                 <h2 className="text-3xl font-bold text-gray-800">Restaurant Closed</h2>
                 <p className="text-gray-500 mt-2 mb-6">{closedMessage}</p>
                 <button
@@ -151,7 +159,7 @@ export default function RestaurantMenu() {
 
     if (!restaurant) return (
         <div className="py-20 text-center flex flex-col items-center">
-            <span className="text-6xl mb-4">🍽️</span>
+            <ShopOutlined className="text-6xl text-gray-300 mb-4" />
             <h2 className="text-2xl font-bold text-gray-800">Restaurant not found</h2>
             <p className="text-gray-500 mt-2">We couldn't find the restaurant you're looking for.</p>
         </div>
@@ -170,11 +178,19 @@ export default function RestaurantMenu() {
                     <div>
                         <h1 className="text-4xl font-bold text-white mb-2">{restaurant.name}</h1>
                         <div className="flex items-center gap-4 text-white/90">
-                            <span className="flex items-center gap-1 font-bold">⭐ {restaurant.rating}</span>
+                            <span className="flex items-center gap-1 font-bold">
+                                <StarFilled className="text-yellow-400" /> {restaurant.rating}
+                            </span>
                             <span>•</span>
                             <span>{restaurant.cuisine_type}</span>
                             <span>•</span>
-                            <span>{restaurant.is_open ? '🟢 Open Now' : '🔴 Closed'}</span>
+                            <span className="flex items-center gap-1">
+                                {restaurant.is_open ? (
+                                    <><CheckCircleFilled className="text-green-400" /> Open Now</>
+                                ) : (
+                                    <><CloseCircleFilled className="text-red-400" /> Closed</>
+                                )}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -230,7 +246,7 @@ export default function RestaurantMenu() {
                         ))
                     ) : (
                         <div className="text-center py-20 bg-white rounded-3xl shadow-sm border border-dashed border-gray-200">
-                            <span className="text-4xl mb-4 block">🍳</span>
+                            <CoffeeOutlined className="text-4xl text-gray-200 mb-4 block" />
                             <p className="text-gray-400 font-medium">
                                 This restaurant hasn't added any menu categories yet.
                             </p>
