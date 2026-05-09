@@ -240,7 +240,7 @@ export default function MenuManagement() {
                                     <span className="text-primary font-black text-lg">{(parseFloat(item.price)).toLocaleString()}đ</span>
                                 </div>
                                 <Tag className="mb-3 rounded-full border-none bg-orange-50 text-orange-500 font-bold px-3">
-                                    {item.MenuCategory?.name || 'Uncategorized'}
+                                    {item.category?.name || 'Uncategorized'}
                                 </Tag>
                                 <p className="text-gray-500 text-sm line-clamp-2 h-10 mb-2">{item.description || 'No description provided.'}</p>
                             </Card>

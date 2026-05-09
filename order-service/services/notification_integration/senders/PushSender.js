@@ -1,4 +1,5 @@
 const NotificationSender = require('./NotificationSender');
+const notificationProxy = require('../../NotificationProxy');
 
 function getDefaultEventName(message) {
   if (message.pushEvent) return message.pushEvent;
@@ -17,11 +18,11 @@ function getDefaultEventName(message) {
 
 class PushSender extends NotificationSender {
   async send(message) {
-    if (!message?.io || !message?.recipient) {
+    if (!message?.recipient) {
       return {
         ok: false,
         channel: 'push',
-        message: 'Missing io instance or push recipient',
+        message: 'Missing push recipient',
       };
     }
 
@@ -34,7 +35,8 @@ class PushSender extends NotificationSender {
       type: message.type || 'system',
     };
 
-    message.io.to(String(message.recipient)).emit(eventName, payload);
+    // Call Microservice instead of local io.emit
+    await notificationProxy.emitRealtime(String(message.recipient), eventName, payload);
 
     return {
       ok: true,

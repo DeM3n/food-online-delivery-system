@@ -94,7 +94,7 @@ class RestaurantOpsService {
             include: [
                 {
                     model: OrderItem,
-                    include: [{ model: MenuItem, include: [{ model: MenuCategory }] }]
+                    include: [{ model: MenuItem, include: [{ model: MenuCategory, as: 'category' }] }]
                 }
             ]
         });
@@ -130,7 +130,7 @@ class RestaurantOpsService {
         const catMap = {};
         deliveredOrders.forEach(order => {
             (order.OrderItems || []).forEach(item => {
-                const catName = item.MenuItem?.MenuCategory?.name || 'Other';
+                const catName = item.MenuItem?.category?.name || 'Other';
                 if (!catMap[catName]) catMap[catName] = 0;
                 catMap[catName] += Number(item.quantity);
             });

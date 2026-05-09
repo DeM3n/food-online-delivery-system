@@ -39,20 +39,20 @@ app.use((req, res, next) => {
 
 // Import routes
 // const authRoutes = require('./routes/authRoutes'); // MOVED TO IDENTITY-SERVICE
-const restaurantRoutes = require('./routes/restaurantRoutes');
-const menuRoutes = require('./routes/menuRoutes');
+// const restaurantRoutes = require('./routes/restaurantRoutes'); // MOVED TO RESTAURANT-SERVICE
+// const menuRoutes = require('./routes/menuRoutes'); // MOVED TO RESTAURANT-SERVICE
 // const orderRoutes = require('./routes/orderRoutes'); // MOVED TO ORDER-SERVICE
 const adminRoutes = require('./routes/adminRoutes');
-const cartRoutes = require('./routes/cartRoutes');
+// const cartRoutes = require('./routes/cartRoutes'); // MOVED TO ORDER-SERVICE
 // const paymentRoutes = require('./routes/paymentRoutes'); // MOVED TO ORDER-SERVICE
 
 // Mount routes
 // app.use('/api/auth', authRoutes); // HANDLED BY IDENTITY-SERVICE VIA GATEWAY
-app.use('/api/restaurants', restaurantRoutes);
-app.use('/api/menu', menuRoutes);
+// app.use('/api/restaurants', restaurantRoutes); // HANDLED BY RESTAURANT-SERVICE VIA GATEWAY
+// app.use('/api/menu', menuRoutes); // HANDLED BY RESTAURANT-SERVICE VIA GATEWAY
 // app.use('/api/orders', orderRoutes); // HANDLED BY ORDER-SERVICE VIA GATEWAY
-app.use('/api/cart', cartRoutes);
-app.use('/api/admin', adminRoutes);
+// app.use('/api/cart', cartRoutes); // HANDLED BY ORDER-SERVICE VIA GATEWAY
+// app.use('/api/admin', adminRoutes); // HANDLED BY IDENTITY & ORDER SERVICES VIA GATEWAY
 // app.use('/api/payments', paymentRoutes); // HANDLED BY ORDER-SERVICE VIA GATEWAY
 
 // Socket.io Connection Logic

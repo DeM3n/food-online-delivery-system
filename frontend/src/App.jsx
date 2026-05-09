@@ -54,11 +54,33 @@ function App() {
             const data = response.data.data;
             // Determine which profile is active
             let profile = null;
-            if (data.Customer) profile = data.Customer;
-            else if (data.Restaurant) profile = data.Restaurant;
-            else if (data.DeliveryPartner) profile = data.DeliveryPartner;
-            else if (data.Admin) profile = data.Admin;
-            else if (data.CustomerSupport) profile = data.CustomerSupport;
+            if (data.role === 'customer') profile = data.Customer;
+            else if (data.role === 'delivery_partner') profile = data.DeliveryPartner;
+            else if (data.role === 'admin') profile = data.Admin;
+            else if (data.role === 'customer_support') profile = data.CustomerSupport;
+
+            // Microservices: Fetch restaurant profile manually
+            if (data.role === 'restaurant') {
+              try {
+                const profileRes = await axios.get('/restaurants/my-profile', {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                profile = profileRes.data.data;
+              } catch (profileErr) {
+                if (profileErr.response?.status === 404) {
+                    try {
+                        const createRes = await axios.post('/restaurants', {
+                          name: data.full_name + "'s Restaurant"
+                        }, { headers: { Authorization: `Bearer ${token}` } });
+                        profile = createRes.data.data;
+                      } catch (createErr) {
+                        console.error('Failed to auto-create restaurant profile:', createErr);
+                      }
+                } else {
+                    console.error("Could not fetch restaurant profile", profileErr);
+                }
+              }
+            }
 
             dispatch(loginSuccess({
               user: {

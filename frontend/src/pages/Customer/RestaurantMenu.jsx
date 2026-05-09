@@ -216,8 +216,8 @@ export default function RestaurantMenu() {
                             <section key={category.id}>
                                 <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">{category.name}</h2>
                                 <div className="space-y-4">
-                                    {category.MenuItems && category.MenuItems.length > 0 ? (
-                                        category.MenuItems.map(item => (
+                                    {category.items && category.items.length > 0 ? (
+                                        category.items.map(item => (
                                             <div key={item.id} className={`bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4 hover:shadow-md transition-shadow relative overflow-hidden ${!item.is_available ? 'grayscale-[0.5] opacity-80' : ''}`}>
                                                 {!item.is_available && (
                                                     <div className="absolute top-2 right-2 z-10">

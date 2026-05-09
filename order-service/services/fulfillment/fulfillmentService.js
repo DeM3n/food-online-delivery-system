@@ -1,7 +1,7 @@
 const { Order, Customer, Restaurant, DeliveryPartner, User, OrderItem, Address, Notification, MenuItem, MenuCategory, sequelize } = require('../../models');
 const { Op } = require('sequelize');
 const paymentService = require('../paymentService');
-const { sendDeliveredOrderEmail } = require('../mailService');   
+const notificationProxy = require('../NotificationProxy');
 const {
     OrderStatusContext,
     assertRoleCanUpdateStatus,
@@ -13,6 +13,7 @@ module.exports = require('../orderService');
  * Interface: IOrderFulfillmentAPI
  */
 class FulfillmentService {
+    // ... (getUserOrders and getMonthlyFavorite remain same)
     async getUserOrders(userId, { date, limit = 5, offset = 0 } = {}) {
         const customer = await Customer.findOne({ where: { user_id: userId } });
         if (!customer) throw new Error('Customer not found');
@@ -159,10 +160,9 @@ class FulfillmentService {
                 ]
             });
 
-            // Emit NEW_ORDER to the restaurant
-            if (fullOrder.Restaurant && io) {
-                console.log(`📡 Socket.io: Emitting NEW_ORDER to restaurant user ${fullOrder.Restaurant.user_id}`);
-                io.to(fullOrder.Restaurant.user_id).emit('NEW_ORDER', {
+            // Notify NEW_ORDER via Proxy
+            if (fullOrder.Restaurant) {
+                notificationProxy.emitRealtime(fullOrder.Restaurant.user_id, 'NEW_ORDER', {
                     orderId: fullOrder.id,
                     status: fullOrder.status,
                     total_amount: fullOrder.total_amount
@@ -229,18 +229,16 @@ class FulfillmentService {
 
         const statusData = { orderId: order.id, status: order.status };
 
-        if (order.Customer && io) {
-            console.log(`📡 Socket.io: Emitting ORDER_STATUS_UPDATED to customer ${order.Customer.user_id}:`, statusData);
-            io.to(order.Customer.user_id).emit('ORDER_STATUS_UPDATED', statusData);
+        if (order.Customer) {
+            notificationProxy.emitRealtime(order.Customer.user_id, 'ORDER_STATUS_UPDATED', statusData);
         }
     
-        if (order.Restaurant && io) {
-            console.log(`📡 Socket.io: Emitting ORDER_STATUS_UPDATED to restaurant ${order.Restaurant.user_id}:`, statusData);
-            io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', statusData);
+        if (order.Restaurant) {
+            notificationProxy.emitRealtime(order.Restaurant.user_id, 'ORDER_STATUS_UPDATED', statusData);
         }
 
-        if (order.status === 'preparing' && io) {
-            io.to('available_deliveries').emit('AVAILABLE_DELIVERY', {
+        if (order.status === 'preparing') {
+            notificationProxy.emitRealtime('available_deliveries', 'AVAILABLE_DELIVERY', {
                 orderId: order.id,
                 restaurantName: order.Restaurant?.name || 'Restaurant'
             });
@@ -252,13 +250,11 @@ class FulfillmentService {
             const restaurantName = order.Restaurant?.name;
 
             if (customerEmail) {
-                sendDeliveredOrderEmail({
+                notificationProxy.sendEmail('delivered', {
                     to: customerEmail,
                     customerName,
                     orderId: order.id,
                     restaurantName,
-                }).catch((mailError) => {
-                    console.error('Send delivered email failed:', mailError);
                 });
             }
         }
@@ -282,7 +278,7 @@ class FulfillmentService {
         }
 
         const stateContext = new OrderStatusContext(order.status);
-        stateContext.transitionTo('cancelled'); // State Pattern sẽ tự ném lỗi nếu không được phép
+        stateContext.transitionTo('cancelled');
 
         let refund = {
             refunded: false,
@@ -308,31 +304,29 @@ class FulfillmentService {
         }
 
         if (refund.refundResponseCode === '99') {
-            order.status = stateContext.getCurrentStatus(); // Lấy từ State Pattern thay vì gán cứng
+            order.status = stateContext.getCurrentStatus();
             order.payment_status = 'refunded';
         } else {
-            order.status = stateContext.getCurrentStatus(); // Lấy từ State Pattern thay vì gán cứng
+            order.status = stateContext.getCurrentStatus();
             order.payment_status = 'cancelled';
         }
 
         await order.save();
 
-        if (io) {
-            if (order.Customer) {
-                io.to(order.Customer.user_id).emit('ORDER_STATUS_UPDATED', {
-                    orderId: order.id,
-                    status: order.status,
-                    refund,
-                });
-            }
+        if (order.Customer) {
+            notificationProxy.emitRealtime(order.Customer.user_id, 'ORDER_STATUS_UPDATED', {
+                orderId: order.id,
+                status: order.status,
+                refund,
+            });
+        }
 
-            if (order.Restaurant) {
-                io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', {
-                    orderId: order.id,
-                    status: order.status,
-                    refund,
-                });
-            }
+        if (order.Restaurant) {
+            notificationProxy.emitRealtime(order.Restaurant.user_id, 'ORDER_STATUS_UPDATED', {
+                orderId: order.id,
+                status: order.status,
+                refund,
+            });
         }
 
         return { order, refund };

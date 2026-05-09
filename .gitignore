@@ -38,3 +38,5 @@ backend/reset_*.js
 backend/sync_*.js
 check_models.js
 model_audit.json
+# Added by code-review-graph
+.code-review-graph/

@@ -34,6 +34,13 @@ const Restaurant = sequelize.define('Restaurant', {
   },
   delivery_radius: {
     type: DataTypes.DECIMAL(5, 2),
+  },
+  min_order_amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
+  image_url: {
+    type: DataTypes.STRING(1000),
   }
 }, {
   tableName: 'restaurant',

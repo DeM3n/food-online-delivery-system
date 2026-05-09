@@ -1,18 +1,31 @@
-const { User, Customer, Restaurant, DeliveryPartner, Admin, CustomerSupport, Address } = require('../models');
+const { User, Customer, DeliveryPartner, Admin, CustomerSupport, Address } = require('../models');
 const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
 const UserAccount = require('../states/account/UserAccount');
 
 class AuthService {
-  generateToken(id) {
-    return jwt.sign({ id }, process.env.JWT_SECRET || 'secret', {
-      expiresIn: '30d',
-    });
+  generateToken(user) {
+    const fs = require('fs');
+    const path = require('path');
+    const privateKey = fs.readFileSync(path.join(__dirname, '../certs/private.key'));
+
+    return jwt.sign(
+      { 
+        id: user.id, 
+        role: user.role,
+        email: user.email,
+        full_name: user.full_name
+      }, 
+      privateKey, 
+      { 
+        algorithm: 'RS256',
+        expiresIn: '30d' 
+      }
+    );
   }
 
   async resolveProfile(user) {
     if (user.Customer) return user.Customer;
-    if (user.Restaurant) return user.Restaurant;
     if (user.DeliveryPartner) return user.DeliveryPartner;
     if (user.Admin) return user.Admin;
     if (user.CustomerSupport) return user.CustomerSupport;
@@ -56,7 +69,9 @@ class AuthService {
         profile = await Customer.create({ user_id: user.id });
         break;
       case 'restaurant':
-        profile = await Restaurant.create({ user_id: user.id, name: name || full_name || 'New Restaurant' });
+        // Microservices: Restaurant profile creation should be handled by restaurant-service
+        // Either via an event or direct API call. For now we set profile to null.
+        profile = null;
         break;
       case 'delivery_partner':
         profile = await DeliveryPartner.create({ user_id: user.id, vehicle_license });
@@ -74,7 +89,7 @@ class AuthService {
     return {
       user,
       profile,
-      token: this.generateToken(user.id),
+      token: this.generateToken(user),
       accountState: account.getStateName()
     };
   }
@@ -84,7 +99,6 @@ class AuthService {
       where: { email },
       include: [
         { model: Customer, include: [Address] },
-        { model: Restaurant },
         { model: DeliveryPartner },
         { model: Admin },
         { model: CustomerSupport }
@@ -101,7 +115,7 @@ class AuthService {
     return {
       user,
       profile: await this.resolveProfile(user),
-      token: this.generateToken(user.id),
+      token: this.generateToken(user),
       accountState: account.getStateName()
     };
   }
@@ -141,7 +155,6 @@ class AuthService {
       attributes: { exclude: ['password_hash'] },
       include: [
         { model: Customer, include: [Address] },
-        { model: Restaurant },
         { model: DeliveryPartner },
         { model: Admin },
         { model: CustomerSupport }
@@ -170,23 +183,8 @@ class AuthService {
     await user.save();
 
     if (user.role === 'restaurant') {
-      const restaurant = await Restaurant.findOne({ where: { user_id: user.id } });
-      if (restaurant) {
-        const wasOpen = restaurant.is_open;
-        if (restaurant_name) restaurant.name = restaurant_name;
-        if (location) restaurant.location = location;
-        if (cuisine_type) restaurant.cuisine_type = cuisine_type;
-        if (typeof is_open === 'boolean') restaurant.is_open = is_open;
-        await restaurant.save();
-
-        if (io && wasOpen !== restaurant.is_open) {
-          io.emit('RESTAURANT_STATUS_UPDATED', {
-            restaurantId: restaurant.id,
-            name: restaurant.name,
-            is_open: restaurant.is_open
-          });
-        }
-      }
+      // Microservices: Restaurant profile updates should be sent directly to restaurant-service by the client
+      // identity-service no longer manages restaurant profiles
     } else if (user.role === 'delivery_partner') {
       const driver = await DeliveryPartner.findOne({ where: { user_id: user.id } });
       if (driver) {

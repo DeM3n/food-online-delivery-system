@@ -79,6 +79,30 @@ export default function Login() {
                 setError('');
                 const response = await axios.post('/auth/login', values);
                 const { data } = response.data;
+                let profileData = data.profile;
+
+                // Microservices: Fetch restaurant profile manually
+                if (data.role.toLowerCase() === 'restaurant' && !profileData) {
+                  try {
+                    const profileRes = await axios.get('/restaurants/my-profile', {
+                      headers: { Authorization: `Bearer ${data.token}` }
+                    });
+                    profileData = profileRes.data.data;
+                  } catch (profileErr) {
+                    if (profileErr.response?.status === 404) {
+                        try {
+                            const createRes = await axios.post('/restaurants', {
+                              name: data.full_name + "'s Restaurant"
+                            }, { headers: { Authorization: `Bearer ${data.token}` } });
+                            profileData = createRes.data.data;
+                          } catch (createErr) {
+                            console.error('Failed to auto-create restaurant profile:', createErr);
+                          }
+                    } else {
+                        console.error("Could not fetch restaurant profile", profileErr);
+                    }
+                  }
+                }
 
                 dispatch(loginSuccess({
                   user: { 
@@ -88,7 +112,7 @@ export default function Login() {
                     full_name: data.full_name,
                     phone_number: data.phone_number
                   },
-                  profile: data.profile,
+                  profile: profileData,
                   token: data.token
                 }));
 

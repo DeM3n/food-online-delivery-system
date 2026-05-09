@@ -14,6 +14,7 @@ const SERVICES = {
     BACKEND: process.env.BACKEND_URL || 'http://localhost:5001',
     ORDER_SERVICE: process.env.ORDER_SERVICE_URL || 'http://localhost:5002',
     IDENTITY_SERVICE: process.env.IDENTITY_SERVICE_URL || 'http://localhost:5003',
+    RESTAURANT_SERVICE: process.env.RESTAURANT_SERVICE_URL || 'http://localhost:5004',
 };
 
 // 1. Security Headers (Helmet) - Adjusted for development
@@ -71,7 +72,7 @@ app.use('/api/auth', createProxyMiddleware({
     }
 }));
 
-// Route Order & Payment Service (more specific)
+// Route Order & Payment Service
 app.use(['/api/orders', '/api/payments'], createProxyMiddleware({
     target: SERVICES.ORDER_SERVICE,
     changeOrigin: true,
@@ -88,6 +89,90 @@ app.use(['/api/orders', '/api/payments'], createProxyMiddleware({
             error: 'Bad Gateway', 
             details: 'The order service is currently unavailable.' 
         });
+    }
+}));
+
+// Route Cart Service
+app.use('/api/cart', createProxyMiddleware({
+    target: SERVICES.ORDER_SERVICE,
+    changeOrigin: true,
+    onProxyReq: (proxyReq, req, res) => {
+        proxyReq.setHeader('X-Gateway-Request', 'true');
+        proxyReq.setHeader('X-Service-Name', 'order-service');
+    },
+    onProxyRes: (proxyRes, req, res) => {
+        proxyRes.headers['X-Service-Name'] = 'order-service';
+    },
+    onError: (err, req, res) => {
+        console.error('Proxy Error (Cart Service):', err.message);
+        res.status(502).json({ 
+            error: 'Bad Gateway', 
+            details: 'The cart service (via order service) is currently unavailable.' 
+        });
+    }
+}));
+
+// Route Admin - Orders (to Order Service)
+app.use('/api/admin/orders', createProxyMiddleware({
+    target: SERVICES.ORDER_SERVICE,
+    changeOrigin: true,
+    onProxyReq: (proxyReq, req, res) => {
+        proxyReq.setHeader('X-Gateway-Request', 'true');
+        proxyReq.setHeader('X-Service-Name', 'order-service');
+    },
+    onProxyRes: (proxyRes, req, res) => {
+        proxyRes.headers['X-Service-Name'] = 'order-service';
+    },
+    onError: (err, req, res) => {
+        console.error('Proxy Error (Admin Orders):', err.message);
+        res.status(502).json({ error: 'Bad Gateway' });
+    }
+}));
+
+// Route Admin - Identity/Stats/Approvals (to Identity Service)
+app.use('/api/admin', createProxyMiddleware({
+    target: SERVICES.IDENTITY_SERVICE,
+    changeOrigin: true,
+    onProxyReq: (proxyReq, req, res) => {
+        proxyReq.setHeader('X-Gateway-Request', 'true');
+        proxyReq.setHeader('X-Service-Name', 'identity-service');
+    },
+    onProxyRes: (proxyRes, req, res) => {
+        proxyRes.headers['X-Service-Name'] = 'identity-service';
+    },
+    onError: (err, req, res) => {
+        console.error('Proxy Error (Admin Identity):', err.message);
+        res.status(502).json({ error: 'Bad Gateway' });
+    }
+}));
+
+// Route Restaurant Service
+app.use(['/api/restaurants', '/api/menu'], createProxyMiddleware({
+    target: SERVICES.RESTAURANT_SERVICE,
+    changeOrigin: true,
+    onProxyReq: (proxyReq, req, res) => {
+        proxyReq.setHeader('X-Gateway-Request', 'true');
+        proxyReq.setHeader('X-Service-Name', 'restaurant-service');
+    },
+    onProxyRes: (proxyRes, req, res) => {
+        proxyRes.headers['X-Service-Name'] = 'restaurant-service';
+    },
+    onError: (err, req, res) => {
+        console.error('Proxy Error (Restaurant Service):', err.message);
+        res.status(502).json({ 
+            error: 'Bad Gateway', 
+            details: 'The restaurant service is currently unavailable.' 
+        });
+    }
+}));
+
+// Route Notification Service
+app.use('/api/notifications', createProxyMiddleware({
+    target: 'http://localhost:5005',
+    changeOrigin: true,
+    onError: (err, req, res) => {
+        console.error('Proxy Error (Notification Service):', err.message);
+        res.status(502).json({ error: 'Bad Gateway' });
     }
 }));
 
@@ -111,7 +196,7 @@ app.use('/api', createProxyMiddleware({
  * 6. Proxy Configuration - Socket.io (WebSockets)
  */
 const socketProxy = createProxyMiddleware({
-    target: SERVICES.ORDER_SERVICE, // Point to ORDER_SERVICE for real-time order events
+    target: 'http://localhost:5005', // Now points to NOTIFICATION_SERVICE
     changeOrigin: true,
     ws: true, 
     logLevel: 'debug',
@@ -124,8 +209,7 @@ app.use('/socket.io', socketProxy);
 
 const server = app.listen(PORT, () => {
     console.log(`🚀 API Gateway running at http://localhost:${PORT}`);
-    console.log(`🔗 Proxying /api/orders to: ${SERVICES.ORDER_SERVICE}`);
-    console.log(`🔗 Proxying other /api calls to: ${SERVICES.BACKEND}`);
+    console.log(`🔗 Proxying /socket.io to: http://localhost:5005`);
 });
 
 // Handle WebSocket upgrade manually

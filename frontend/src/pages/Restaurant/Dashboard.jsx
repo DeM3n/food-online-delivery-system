@@ -20,7 +20,13 @@ export default function RestaurantDashboard() {
   }, [profile?.is_open]);
 
   const fetchData = async () => {
+    if (!profile?.id) {
+        setLoading(false);
+        return;
+    }
+
     try {
+      setLoading(true);
       const [ordersRes, menuRes] = await Promise.all([
         axios.get('/orders/restaurant/me'),
         axios.get(`/menu/full/${profile.id}`)
@@ -31,12 +37,16 @@ export default function RestaurantDashboard() {
       }
 
       if (menuRes.data.success) {
-        // Flatten items from categories
-        const items = menuRes.data.data.flatMap(cat => cat.MenuItems || []);
-        setMenuItems(items.sort((a, b) => b.rating - a.rating).slice(0, 5));
+        // Flatten items from categories (matching 'items' alias in restaurant-service)
+        const items = (menuRes.data.data || []).flatMap(cat => cat.items || []);
+        setMenuItems(items.sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 5));
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      notification.error({
+        message: 'Data Load Error',
+        description: 'Failed to load dashboard data. Please refresh.',
+      });
     } finally {
       setLoading(false);
     }
@@ -50,27 +60,76 @@ export default function RestaurantDashboard() {
       socket.connect();
       socket.emit('join', user.id);
 
-      socket.on('NEW_ORDER', (data) => {
+      const handleNewOrder = (data) => {
         notification.success({
           message: 'New Order Received!',
           description: `You have a new order (#${data.orderId.slice(0, 8)}) for ${data.totalAmount.toLocaleString()}đ`,
           placement: 'topRight',
           duration: 10
         });
-        fetchData(); // Auto refresh
-      });
+        fetchData(); 
+      };
 
-      socket.on('ORDER_STATUS_UPDATED', (data) => {
-        fetchData(); // Auto refresh
-      });
+      const handleStatusUpdate = () => fetchData();
+
+      socket.on('NEW_ORDER', handleNewOrder);
+      socket.on('ORDER_STATUS_UPDATED', handleStatusUpdate);
 
       return () => {
-        socket.off('NEW_ORDER');
-        socket.off('ORDER_STATUS_UPDATED');
+        socket.off('NEW_ORDER', handleNewOrder);
+        socket.off('ORDER_STATUS_UPDATED', handleStatusUpdate);
         socket.disconnect();
       };
+    } else {
+        // Wait a bit for profile to hydrate then stop loading
+        const timer = setTimeout(() => {
+            if (!profile?.id) setLoading(false);
+        }, 2000);
+        return () => clearTimeout(timer);
     }
   }, [profile, user]);
+
+  const handleCreateProfile = async () => {
+    try {
+        setLoading(true);
+        const response = await axios.post('/restaurants', {
+            name: user.full_name + "'s Restaurant"
+        });
+        if (response.data.success) {
+            dispatch(loginSuccess({
+                user,
+                profile: response.data.data,
+                token
+            }));
+            notification.success({ message: 'Restaurant profile created successfully!' });
+        }
+    } catch (err) {
+        notification.error({ 
+            message: 'Failed to create profile', 
+            description: err.response?.data?.message || 'Please try again or contact support.'
+        });
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-500 font-bold">Initializing dashboard...</p>
+    </div>
+  );
+
+  if (!profile || !profile.id) return (
+    <div className="py-20 text-center bg-white rounded-3xl shadow-soft border border-dashed border-gray-200 m-8">
+        <h2 className="text-2xl font-black text-gray-800 mb-2">Profile Incomplete</h2>
+        <p className="text-gray-500 mb-6">We couldn't link your account to a restaurant profile.</p>
+        <div className="flex justify-center gap-4">
+            <button onClick={handleCreateProfile} className="btn-primary px-6 py-2">Create Profile Now</button>
+            <button onClick={() => window.location.reload()} className="bg-gray-100 text-gray-600 px-6 py-2 rounded-xl font-bold hover:bg-gray-200">Retry Loading</button>
+        </div>
+    </div>
+  );
 
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -100,37 +159,24 @@ export default function RestaurantDashboard() {
     { label: "Restaurant Rating", value: <>{profile?.rating || 'N/A'} <StarFilled className="text-yellow-400 mb-1" /></>, color: "border-accent" },
   ];
 
-  if (loading) return <div className="py-20 text-center text-xl">Loading dashboard...</div>;
-
   const handleToggleRestaurantStatus = async () => {
     if (!profile?.id || updatingStatus) return;
 
     const nextStatus = !isRestaurantOpen;
     try {
       setUpdatingStatus(true);
-      const response = await axios.put('/auth/profile', { is_open: nextStatus });
+      const response = await axios.put('/restaurants/my-profile', { is_open: nextStatus });
 
       if (response.data.success) {
-        const updatedData = response.data.data;
-        let activeProfile = null;
-        if (updatedData.Customer) activeProfile = updatedData.Customer;
-        else if (updatedData.Restaurant) activeProfile = updatedData.Restaurant;
-        else if (updatedData.DeliveryPartner) activeProfile = updatedData.DeliveryPartner;
-        else if (updatedData.Admin) activeProfile = updatedData.Admin;
+        const updatedProfile = response.data.data;
 
         dispatch(loginSuccess({
-          user: {
-            id: updatedData.id,
-            email: updatedData.email,
-            role: updatedData.role,
-            full_name: updatedData.full_name,
-            phone_number: updatedData.phone_number
-          },
-          profile: activeProfile,
+          user: user, // Keep existing user
+          profile: updatedProfile,
           token
         }));
 
-        setIsRestaurantOpen(Boolean(activeProfile?.is_open));
+        setIsRestaurantOpen(Boolean(updatedProfile?.is_open));
         notification.success({
           message: 'Restaurant status updated',
           description: nextStatus

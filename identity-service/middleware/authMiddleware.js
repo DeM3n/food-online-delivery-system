@@ -9,8 +9,12 @@ exports.protect = async (req, res, next) => {
     try {
       token = req.headers.authorization.split(' ')[1];
 
-      // Decode token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // Decode token using Public Key
+      const fs = require('fs');
+      const path = require('path');
+      const publicKey = fs.readFileSync(path.join(__dirname, '../certs/public.key'));
+      
+      const decoded = jwt.verify(token, publicKey, { algorithms: ['RS256'] });
 
       // Add user to request
       req.user = await User.findByPk(decoded.id, { attributes: { exclude: ['password'] } });
@@ -37,4 +41,13 @@ exports.authorize = (...roles) => {
     }
     next();
   };
+};
+
+// Admin only middleware
+exports.admin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ success: false, message: 'Not authorized as an admin' });
+  }
 };

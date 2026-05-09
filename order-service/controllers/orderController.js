@@ -182,40 +182,56 @@ exports.cancelOrder = async (req, res) => {
 exports.getActiveCount = async (req, res) => {
     try {
         const { id, role } = req.user;
-        const { Order, Restaurant, DeliveryPartner } = require('../models');
+        const { Order } = require('../models');
         const { Op } = require('sequelize');
+        const axios = require('axios');
+        const token = req.headers.authorization.split(' ')[1];
 
         let count = 0;
 
         if (role === 'restaurant') {
-            const restaurant = await Restaurant.findOne({ where: { user_id: id } });
-            if (restaurant) {
-                count = await Order.count({
-                    where: {
-                        restaurant_id: restaurant.id,
-                        status: { [Op.in]: ['pending', 'accepted'] }
-                    }
+            try {
+                const response = await axios.get('http://localhost:5004/api/restaurants/my-profile', {
+                    headers: { Authorization: `Bearer ${token}` }
                 });
+                const restaurant = response.data.data;
+                if (restaurant) {
+                    count = await Order.count({
+                        where: {
+                            restaurant_id: restaurant.id,
+                            status: { [Op.in]: ['pending', 'accepted'] }
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Could not fetch restaurant profile for active count", e.message);
             }
         } else if (role === 'delivery_partner') {
-            const driver = await DeliveryPartner.findOne({ where: { user_id: id } });
-            if (driver) {
-                // For driver: their active deliveries (picked_up) + overall available ones (preparing and unassigned)
-                const activeCount = await Order.count({
-                    where: {
-                        delivery_partner_id: driver.id,
-                        status: 'picked_up'
-                    }
+            try {
+                const response = await axios.get('http://localhost:5003/api/auth/profile', {
+                    headers: { Authorization: `Bearer ${token}` }
                 });
-                
-                const availableCount = await Order.count({
-                    where: {
-                        status: 'preparing',
-                        delivery_partner_id: null
-                    }
-                });
-                
-                count = activeCount + availableCount;
+                const driver = response.data.data.DeliveryPartner;
+                if (driver) {
+                    // For driver: their active deliveries (picked_up) + overall available ones (preparing and unassigned)
+                    const activeCount = await Order.count({
+                        where: {
+                            delivery_partner_id: driver.id,
+                            status: 'picked_up'
+                        }
+                    });
+                    
+                    const availableCount = await Order.count({
+                        where: {
+                            status: 'preparing',
+                            delivery_partner_id: null
+                        }
+                    });
+                    
+                    count = activeCount + availableCount;
+                }
+            } catch (e) {
+                console.error("Could not fetch driver profile for active count", e.message);
             }
         }
 
