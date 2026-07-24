@@ -21,6 +21,23 @@ const DeliveryPartner = sequelize.define('DeliveryPartner', {
   },
   rating: {
     type: DataTypes.DECIMAL(3, 2),
+  },
+  latitude: {
+    type: DataTypes.DECIMAL(10, 7),
+  },
+  longitude: {
+    type: DataTypes.DECIMAL(10, 7),
+  },
+  last_location_update: {
+    type: DataTypes.DATE,
+  },
+  acceptance_rate: {
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 100.00,
+  },
+  last_idle_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
   }
 }, {
   tableName: 'delivery_partner',

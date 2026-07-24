@@ -34,6 +34,12 @@ const Restaurant = sequelize.define('Restaurant', {
   },
   delivery_radius: {
     type: DataTypes.DECIMAL(5, 2),
+  },
+  latitude: {
+    type: DataTypes.DECIMAL(10, 7),
+  },
+  longitude: {
+    type: DataTypes.DECIMAL(10, 7),
   }
 }, {
   tableName: 'restaurant',

@@ -1,33 +1,46 @@
-# 🍜 Online Food Delivery System (OFDS)
+# Online Food Delivery System (OFDS)
 
-Full-stack web application for an online food delivery platform, supporting Customers, Restaurants, Delivery Partners, and Admins.
+Full-stack web application for an online food delivery platform, supporting Customers, Restaurants, Delivery Partners, and Admins. Built with a modular microservice-capable architecture, real-time socket communication, and an automated Order Dispatch Engine.
 
 ---
 
-## 🧰 Tech Stack
+## Technical Stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | React + Vite + TailwindCSS + Redux Toolkit |
-| Backend | Node.js + Express.js |
-| Database | MySQL / SQL Server |
+| Frontend | React, Vite, TailwindCSS, Redux Toolkit |
+| Backend Runtime | Node.js, Express.js |
+| Architecture | Monolith & Microservices (Gateway, Identity, Order, Restaurant, Notification) |
+| Database | MySQL / SQL Server (MSSQL) |
 | ORM | Sequelize |
-| Auth | JWT (JSON Web Token) |
-| Real-time | Socket.io |
+| Authentication | JWT (JSON Web Token) with Role-Based Access Control |
+| Real-time Communication | Socket.io |
 
 ---
 
-## 📋 Prerequisites
+## Core System Features & Architecture
 
-Make sure your machine has these installed:
+### Automated Order Dispatch Engine
+The platform includes an intelligent Order Dispatching System (`dispatchService.js`) replacing traditional broadcast mechanisms with targeted sequential offers:
 
-- [Node.js](https://nodejs.org/) v18+
-- [MySQL](https://www.mysql.com/) or SQL Server (MSSQL)
-- [Git](https://git-scm.com/)
+- **Geospatial Bounding-Box Pre-Filtering**: Queries candidate drivers using SQL bounding-box coordinate ranges (`minLat..maxLat`, `minLng..maxLng`) to leverage database indexes, excluding inactive drivers whose GPS coordinates are older than 60 seconds.
+- **Candidate Ranking Algorithm**: Evaluates candidate drivers using a weighted scoring model based on distance to restaurant, driver rating, acceptance rate history, and idle waiting duration.
+- **Sequential Offer Delivery**: Delivers targeted real-time offers to persistent driver rooms (`driver_${driverId}`) with a 15-second response timer via Socket.io.
+- **Dual-Table Atomic Concurrency Lock**: Executes order assignment inside a single database transaction with row locks (`LOCK.UPDATE`). Updates `Order` (`delivery_partner_id = driverId`, `status = 'assigned'`) and `DeliveryPartner` (`is_available = false`) simultaneously. Automatically rolls back if concurrent assignment conflicts occur.
+- **Dynamic Radius Expansion**: Expands search radius iteratively (3 km -> 5 km -> 7 km -> max 15 km). Triggers fallback notifications if no candidates accept at maximum radius.
+- **Startup Recovery Job**: Scans and resumes orphaned dispatches upon server startup.
 
 ---
 
-## 🚀 Getting Started
+## Prerequisites
+
+- Node.js v18 or higher
+- MySQL or SQL Server (MSSQL)
+- Git
+
+---
+
+## Getting Started
 
 ### 1. Clone the Repository
 
@@ -51,7 +64,7 @@ Create a `.env` file from the example template:
 cp .env.example .env
 ```
 
-Then open `.env` and fill in **your own** database credentials:
+Configure `.env` with your database credentials:
 
 ```env
 PORT=5000
@@ -62,9 +75,11 @@ DB_USER=sa
 DB_PASS=YOUR_ACTUAL_DB_PASSWORD
 
 JWT_SECRET=CHANGE_THIS_TO_A_LONG_RANDOM_SECRET_STRING
-```
 
-> ⚠️ Make sure your database server (MySQL/MSSQL) is running and the database `ofds_db` has been created.
+DISPATCH_OFFER_TIMEOUT_MS=15000
+DISPATCH_INITIAL_RADIUS_KM=3.0
+DISPATCH_MAX_RADIUS_KM=15.0
+```
 
 Start the backend server:
 
@@ -72,13 +87,13 @@ Start the backend server:
 npm run dev
 ```
 
-The backend will run at **http://localhost:5000**
+The backend server runs at `http://localhost:5000`.
 
 ---
 
 ### 3. Set Up the Frontend
 
-Open a **new terminal**, then:
+Open a new terminal window:
 
 ```bash
 cd frontend
@@ -86,15 +101,15 @@ npm install
 npm run dev
 ```
 
-The frontend will run at **http://localhost:5173**
+The frontend application runs at `http://localhost:5173`.
 
 ---
 
-## 🗄️ Database Setup
+## Database Setup & Seeding
 
-The application uses **Sequelize ORM** with auto-sync. When you first run the backend, it will automatically create all tables in your database.
+The application uses **Sequelize ORM** with database auto-synchronization.
 
-To seed the database with sample data (restaurants, users, menu items):
+To seed the database with initial sample data (restaurants, menu items, user accounts):
 
 ```bash
 cd backend
@@ -103,9 +118,9 @@ node seed.js
 
 ---
 
-## 👥 Default Roles & Test Accounts
+## Default Test Accounts
 
-After running `seed.js`, you can log in with these test accounts:
+After executing `seed.js`, use the following credentials for role testing:
 
 | Role | Email | Password |
 |---|---|---|
@@ -116,46 +131,54 @@ After running `seed.js`, you can log in with these test accounts:
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```
 ofds/
 ├── backend/
-│   ├── config/         # Database connection
-│   ├── controllers/    # Business logic handlers
-│   ├── middleware/     # Auth (JWT) middleware
-│   ├── models/         # Sequelize ORM models
-│   ├── routes/         # API route definitions
+│   ├── config/         # Database configuration
+│   ├── controllers/    # Request handlers & controllers
+│   ├── middleware/     # Auth & JWT middlewares
+│   ├── models/         # Sequelize ORM models (User, Order, OrderOfferLog, etc.)
+│   ├── routes/         # REST API route definitions
+│   ├── services/       # Core domain services
+│   │   ├── dispatch/   # Order Dispatch Engine (dispatchService.js)
+│   │   ├── delivery_mgmt/ # Delivery management operations
+│   │   └── fulfillment/   # Order fulfillment & state machine
+│   ├── states/         # State pattern implementation for Order workflow
 │   ├── seed.js         # Database seeder
-│   └── server.js       # Entry point
+│   └── server.js       # Express & Socket.io server entry point
+│
+├── gateway/            # API Gateway microservice
+├── identity-service/   # Authentication & Identity microservice
+├── order-service/      # Order management microservice
+├── restaurant-service/ # Restaurant & Menu microservice
+├── notification-service/# Real-time notification microservice
 │
 └── frontend/
     └── src/
-        ├── components/  # Shared UI components & layouts
-        ├── pages/       # Pages by role (Customer, Restaurant, Delivery, Admin)
-        ├── redux/       # State management slices
-        └── App.jsx      # Root component & routing
+        ├── components/ # Reusable UI components
+        ├── pages/      # Application views by user role
+        ├── redux/      # Redux state management
+        └── App.jsx     # Root application component
 ```
 
 ---
 
-## 🔑 API Overview
+## Real-Time Socket.io Events
 
-| Method | Endpoint | Description |
+| Event | Direction | Description |
 |---|---|---|
-| POST | `/api/auth/login` | Login |
-| POST | `/api/auth/register` | Register |
-| GET | `/api/auth/profile` | Get current user profile |
-| GET | `/api/restaurants` | List all restaurants |
-| GET | `/api/menu/full/:restaurantId` | Get full menu for a restaurant |
-| POST | `/api/orders` | Place a new order |
-| GET | `/api/orders/restaurant/:id` | Get orders for a restaurant |
-| PUT | `/api/orders/:id/status` | Update order status |
-| GET | `/api/orders/deliveries/available` | Get orders ready for pickup |
-| PUT | `/api/orders/:id/accept-delivery` | Driver accepts a delivery |
+| `join_driver` | Client -> Server | Joins driver to persistent room `driver_${driverId}` |
+| `DRIVER_UPDATE_LOCATION` | Driver -> Server | Pushes real-time latitude/longitude coordinates |
+| `ORDER_OFFER` | Server -> Driver | Sends targeted sequential offer with countdown timer |
+| `ACCEPT_ORDER_OFFER` | Driver -> Server | Accepts current order offer |
+| `REJECT_ORDER_OFFER` | Driver -> Server | Declines current order offer |
+| `ORDER_STATUS_UPDATED` | Server -> Client | Broadcasts order state updates to Customer/Restaurant |
+| `DISPATCH_FAILED` | Server -> Client | Notifies when no driver is available in service radius |
 
 ---
 
-## 📄 License
+## License
 
-This project is for educational purposes only.
+This project is maintained for educational and demonstration purposes.

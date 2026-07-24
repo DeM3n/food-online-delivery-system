@@ -1,7 +1,8 @@
 const { Order, Customer, Restaurant, DeliveryPartner, User, OrderItem, Address, Notification, MenuItem, MenuCategory, sequelize } = require('../../models');
 const { Op } = require('sequelize');
 const paymentService = require('../paymentService');
-const { sendDeliveredOrderEmail } = require('../mailService');   
+const { sendDeliveredOrderEmail } = require('../mailService');
+const dispatchService = require('../dispatch/dispatchService');   
 const {
     OrderStatusContext,
     assertRoleCanUpdateStatus,
@@ -229,11 +230,8 @@ class FulfillmentService {
             io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', statusData);
         }
 
-        if (order.status === 'preparing' && io) {
-            io.to('available_deliveries').emit('AVAILABLE_DELIVERY', {
-                orderId: order.id,
-                restaurantName: order.Restaurant?.name || 'Restaurant'
-            });
+        if ((order.status === 'preparing' || order.status === 'accepted') && !order.delivery_partner_id) {
+            dispatchService.startDispatchFlow(order.id, io);
         }
 
         if (oldStatus !== 'delivered' && order.status === 'delivered') {
@@ -306,6 +304,8 @@ class FulfillmentService {
         }
 
         await order.save();
+
+        await dispatchService.cancelDispatchFlow(order.id, 'Order cancelled by customer', io);
 
         if (io) {
             if (order.Customer) {

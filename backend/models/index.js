@@ -20,13 +20,14 @@ const Delivery = require('./Delivery');
 const Dispute = require('./Dispute');
 const Review = require('./Review');
 const Notification = require('./Notification');
+const OrderOfferLog = require('./OrderOfferLog');
 
 // ==========================================
 // Define Relationships Based on UML Diagram
 // ==========================================
 
 // 1. User -> Profiles (1:1 Relationships)
-user_profiles = [Restaurant, Customer, DeliveryPartner, Admin, CustomerSupport];
+const user_profiles = [Restaurant, Customer, DeliveryPartner, Admin, CustomerSupport];
 user_profiles.forEach(Profile => {
   User.hasOne(Profile, { foreignKey: 'user_id' });
   Profile.belongsTo(User, { foreignKey: 'user_id' });
@@ -84,6 +85,9 @@ Dispute.belongsTo(Order, { foreignKey: 'order_id' });
 Order.hasMany(Review, { foreignKey: 'order_id' });
 Review.belongsTo(Order, { foreignKey: 'order_id' });
 
+Order.hasMany(OrderOfferLog, { foreignKey: 'order_id' });
+OrderOfferLog.belongsTo(Order, { foreignKey: 'order_id' });
+
 // 6. Delivery Partner
 DeliveryPartner.hasMany(Order, { foreignKey: 'delivery_partner_id' });
 Order.belongsTo(DeliveryPartner, { foreignKey: 'delivery_partner_id' });
@@ -93,6 +97,9 @@ Delivery.belongsTo(DeliveryPartner, { foreignKey: 'delivery_partner_id' });
 
 DeliveryPartner.hasMany(Review, { foreignKey: 'delivery_partner_id' });
 Review.belongsTo(DeliveryPartner, { foreignKey: 'delivery_partner_id' });
+
+DeliveryPartner.hasMany(OrderOfferLog, { foreignKey: 'driver_id' });
+OrderOfferLog.belongsTo(DeliveryPartner, { foreignKey: 'driver_id' });
 
 // 7. Other Links
 Address.hasMany(Order, { foreignKey: 'delivery_address_id' });
@@ -132,5 +139,6 @@ module.exports = {
   Delivery,
   Dispute,
   Review,
-  Notification
+  Notification,
+  OrderOfferLog
 };

@@ -38,7 +38,7 @@ class AcceptedState extends OrderState {
   }
 
   allowedTransitions() {
-    return ['preparing', 'cancelled'];
+    return ['preparing', 'assigned', 'cancelled'];
   }
 }
 
@@ -48,7 +48,17 @@ class PreparingState extends OrderState {
   }
 
   allowedTransitions() {
-    return ['picked_up'];
+    return ['assigned', 'picked_up', 'cancelled'];
+  }
+}
+
+class AssignedState extends OrderState {
+  constructor() {
+    super('assigned');
+  }
+
+  allowedTransitions() {
+    return ['picked_up', 'cancelled'];
   }
 }
 
@@ -58,7 +68,7 @@ class PickedUpState extends OrderState {
   }
 
   allowedTransitions() {
-    return ['delivered'];
+    return ['delivered', 'cancelled'];
   }
 }
 
@@ -94,6 +104,7 @@ const STATE_FACTORIES = {
   pending: () => new PendingState(),
   accepted: () => new AcceptedState(),
   preparing: () => new PreparingState(),
+  assigned: () => new AssignedState(),
   picked_up: () => new PickedUpState(),
   delivered: () => new DeliveredState(),
   completed: () => new CompletedState(),
@@ -129,9 +140,9 @@ class OrderStatusContext {
 }
 
 const ROLE_ALLOWED_TARGETS = {
-  customer: ['completed'],
+  customer: ['completed', 'cancelled'],
   restaurant: ['accepted', 'preparing', 'cancelled'],
-  delivery_partner: ['delivered'],
+  delivery_partner: ['assigned', 'picked_up', 'delivered'],
 };
 
 function assertRoleCanUpdateStatus({ role, targetStatus }) {

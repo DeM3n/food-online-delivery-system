@@ -62,6 +62,39 @@ class DeliveryMgmtService {
         return order;
     }
 
+    async markPickedUpByDriver(orderId, userId, io) {
+        const driver = await DeliveryPartner.findOne({ where: { user_id: userId } });
+        if (!driver) throw new Error('Driver profile not found');
+
+        const order = await Order.findByPk(orderId, {
+            include: [{ model: Customer }, { model: Restaurant }]
+        });
+
+        if (!order) throw new Error('Order not found');
+        if (order.delivery_partner_id !== driver.id) {
+            throw new Error('Order is not assigned to you');
+        }
+        if (order.status !== 'assigned' && order.status !== 'preparing') {
+            throw new Error(`Cannot pick up order in '${order.status}' status`);
+        }
+
+        order.status = 'picked_up';
+        await order.save();
+
+        const statusData = {
+            orderId: order.id,
+            status: 'picked_up',
+            deliveryPartnerId: driver.id
+        };
+
+        if (io) {
+            if (order.Customer) io.to(order.Customer.user_id).emit('ORDER_STATUS_UPDATED', statusData);
+            if (order.Restaurant) io.to(order.Restaurant.user_id).emit('ORDER_STATUS_UPDATED', statusData);
+        }
+
+        return order;
+    }
+
     async getDriverDeliveries(userId) {
         const driver = await DeliveryPartner.findOne({ where: { user_id: userId } });
         if (!driver) throw new Error('Driver profile not found');
@@ -69,10 +102,10 @@ class DeliveryMgmtService {
         return await Order.findAll({
             where: {
                 delivery_partner_id: driver.id,
-                status: 'picked_up'
+                status: { [Op.in]: ['assigned', 'picked_up'] }
             },
             include: [
-                { model: Restaurant, attributes: ['name', 'user_id', 'location'] },
+                { model: Restaurant, attributes: ['name', 'user_id', 'location', 'latitude', 'longitude'] },
                 { model: Address, attributes: ['street', 'city', 'latitude', 'longitude'] },
                 { model: Customer, include: [{ model: User, attributes: ['full_name', 'phone_number'] }] }
             ],

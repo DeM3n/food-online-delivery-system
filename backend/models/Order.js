@@ -27,6 +27,7 @@ const Order = sequelize.define('Order', {
       'pending',
       'accepted',
       'preparing',
+      'assigned',
       'picked_up',
       'delivered',
       'completed',
