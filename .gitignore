@@ -40,3 +40,7 @@ check_models.js
 model_audit.json
 # Added by code-review-graph
 .code-review-graph/
+CLAUDE.md
+GEMINI.md
+AGENTS.md
+.cursorrules
